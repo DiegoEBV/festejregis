@@ -1,0 +1,1636 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Registro Pedidos - FESTEJOS</title>
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#667eea">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 30px;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            border-radius: 20px;
+            color: white;
+            box-shadow: 0 15px 35px rgba(238, 90, 36, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: shimmer 3s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .header h1 {
+            font-size: 2.8em;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            position: relative;
+            z-index: 1;
+        }
+        
+        .date-info {
+            font-size: 1.3em;
+            opacity: 0.95;
+            position: relative;
+            z-index: 1;
+        }
+        /* Main */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        /* Formularios */
+        .form-section {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        .form-section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            text-align: center;
+            padding: 10px;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border-radius: 10px;
+        }
+        .form-group { margin-bottom: 20px; }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 15px rgba(52, 152, 219, 0.3);
+            transform: translateY(-2px);
+        }
+        /* Botones */
+        .btn {
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(39, 174, 96, 0.4);
+        }
+        .btn:active { transform: translateY(-1px); }
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(231, 76, 60, 0.4);
+        }
+        /* Resumen de pedidos pagados */
+        .resumen-pedidos {
+            background: rgba(255,255,255,0.97);
+            border-radius: 16px;
+            margin: 24px auto 0 auto;
+            padding: 30px 30px 15px 30px;
+            box-shadow: 0 8px 32px rgba(50, 50, 100, 0.10);
+            max-width: 1050px;
+        }
+        .resumen-pedidos h2 {
+            background: linear-gradient(90deg, #824bb8 60%, #574b90 100%);
+            color: white;
+            border-radius: 10px 10px 0 0;
+            padding: 18px 0 16px 18px;
+            font-size: 1.35em;
+            text-align: left;
+            margin-bottom: 0;
+            box-shadow: 0 2px 8px #764ba230;
+            letter-spacing: 0.5px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .resumen-pedidos table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 0;
+        }
+        .resumen-pedidos th, .resumen-pedidos td {
+            padding: 15px 12px;
+            text-align: left;
+        }
+        .resumen-pedidos th {
+            background: #563d7c;
+            color: #fff;
+            border-bottom: 2px solid #bca0ff;
+            font-size: 1em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .resumen-pedidos tr {
+            border-bottom: 1px solid #e6e6e6;
+            background: transparent;
+            transition: background 0.2s;
+        }
+        .resumen-pedidos tr:nth-child(even) {
+            background: #eadcff;
+        }
+        .resumen-pedidos td {
+            color: #47337e;
+            font-size: 1.01em;
+        }
+        /* Estadísticas */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            color: white;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+        .stat-card:hover { transform: translateY(-5px); }
+        .stat-card h3 {
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+        .stat-card .amount {
+            font-size: 1.8em;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+        }
+        /* Tablas generales */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: linear-gradient(135deg, #34495e, #2c3e50);
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .resumen-pagados-section {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            margin-top: 30px;
+            max-width: 1400px;
+            margin: 30px auto;
+        }
+        .resumen-pagados-section h2 {
+            color: #fff;
+            margin-bottom: 20px;
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(135deg, #3c3fe7, #2e40df);
+            border-radius: 10px;
+        }
+        /* Highlight filas */
+        tr:hover {
+            background: rgba(52, 152, 219, 0.07);
+            transition: background 0.3s ease;
+        }
+        /* Reportes */
+        .reports-section {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            margin-top: 30px;
+            max-width: 1400px;
+            margin: 30px auto;
+        }
+        .reports-section h2 {
+            color: #fff;
+            margin-bottom: 20px;
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            border-radius: 10px;
+        }
+        /* Fechas */
+        .date-filter {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: end;
+        }
+        .date-filter label {
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+        .date-filter input[type="date"] {
+            border: 1.5px solid #bcb6ec;
+            border-radius: 9px;
+            padding: 9px 12px;
+            font-size: 1.5em;
+            background: #f4f2ff;
+            color: #49416d;
+            margin-right: 7px;
+        }
+        /* Resumen tarjetas / totales */
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .summary-card {
+            background: linear-gradient(135deg, #16a085, #1abc9c);
+            padding: 20px;
+            border-radius: 15px;
+            color: white;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            font-size: 20px;
+        }
+        .summary-card.efectivo {
+        background: #4CAF50 !important;    /* Verde */
+        color: #fff;
+        
+        }
+        .summary-card.yape {
+        background: #9147e4 !important;    /* Morado */
+        color: #fff;
+        }
+        .summary-card.tarjeta {
+        background: #3498db !important;    /* Celeste */
+        color: #fff;
+        }
+        .summary-card.total-dia {
+        background: linear-gradient(135deg, #f39c12, #e67e22) !important;
+        color: #fff;
+        }
+        .summary-card.ganancia {
+        background: linear-gradient(135deg, #f39c12, #e67e22) !important;
+        color: #fff;
+        }
+
+        .summary-card h4 {
+            margin-bottom: 10px;
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        .summary-card .value {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        /* Gestión Base de Datos */
+        .db-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 18px;
+            margin-top: 32px;
+            padding: 30px;
+            background: rgba(255,255,255,0.97);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(50, 50, 100, 0.10);
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .btn-database {
+            background: linear-gradient(90deg, #9147e4 40%, #5e3ea1 100%);
+            color: #fff;
+            padding: 16px 0;
+            font-size: 1.09em;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            flex: 1 1 0px;
+            margin: 0 8px;
+            cursor: pointer;
+            box-shadow: 0 2px 10px #824bb85c;
+            transition: background 0.16s, transform 0.12s;
+        }
+        .btn-database:hover {
+            background: linear-gradient(90deg, #764ba2 30%, #453a94 100%);
+            transform: scale(1.035);
+        }
+        .pago-botones {
+            display: flex;
+            gap: 12px;
+            margin: 15px 0;
+        }
+        
+        .btn-medio {
+            flex: 1;
+            padding: 15px 0;
+            border: 3px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+            color: #333;
+        }
+        
+        .btn-medio:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        
+        .btn-efectivo.selected {
+            border-color: #28a745;
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            color: #155724;
+        }
+        
+        .btn-yape.selected {
+            border-color: #6f42c1;
+            background: linear-gradient(135deg, #e2d9f3, #d1c4e9);
+            color: #4a154b;
+        }
+        
+        .btn-tarjeta.selected {
+            border-color: #007bff;
+            background: linear-gradient(135deg, #cce5ff, #b3d9ff);
+            color: #0c5460;
+        }
+        /* Mensajes */
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            text-align: center;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+        .success {
+            background: #27ae60;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            text-align: center;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+        /* MESAS - grid visual */
+        .mesas-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 15px;
+            justify-content: center;
+            margin: 20px auto 30px auto;
+            max-width: 1200px;
+        }
+        .mesa-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #f4f4f4, #e9e9e9 80%);
+            border: 2.5px solid #bdbdbd;
+            color: #444;
+            font-size: 1.35em;
+            font-weight: bold;
+            border-radius: 20px;
+            box-shadow: 0 4px 18px rgba(50,50,50,0.10);
+            cursor: pointer;
+            height: 74px;
+            min-width: 74px;
+            position: relative;
+            transition: box-shadow .17s, background .14s, border .15s, color .1s;
+            outline: none;
+            user-select: none;
+            margin: 0;
+            text-align: center;
+        }
+        .mesa-libre {
+            border-color: #2e78cc;
+            background: linear-gradient(135deg, #e0eaff, #b7c8ff);
+        }
+        .mesa-ocupada {
+            border-color: #e74c3c;
+            background: linear-gradient(135deg, #ffe4e4, #ffd0d0);
+        }
+        .mesa-parcial, .mesa-pagando {
+            border-color: #f39c12;
+            background: linear-gradient(135deg, #fffbe6, #ffedbc);
+        }
+        .mesa-btn .mesa-num {
+            font-size: 1em;
+            margin-bottom: 2px;
+        }
+        .mesa-btn .mesa-monto {
+            font-size: 0.70em;
+            color: #666;
+            margin-top: 1px;
+        }
+        .mesa-btn .mesa-estado {
+            position: absolute;
+            top: 7px; right: 11px;
+            font-size: 1.2em;
+        }
+        .mesa-btn:active {
+            box-shadow: 0 0 0 0 transparent;
+            border-width: 3.5px;
+        }
+        .mesas-seccion {
+            display: flex;
+            flex-direction: row;
+            gap: 36px;
+            align-items: flex-start;
+            justify-content: center;
+        }
+
+        .pedidos-especiales-lateral {
+            display: flex;
+            flex-direction: column;
+            gap: 22px;
+        }
+
+        .pedido-especial-box {
+            background: rgba(255,255,255,0.92);
+            border-radius: 16px;
+            padding: 12px;
+            box-shadow: 0 4px 16px #0001;
+            margin-bottom: 8px;
+            min-width: 220px;
+        }
+
+        .btn-pedido-especial {
+            display: block;
+            width: 100%;
+            padding: 10px 0 12px 0;
+            border-radius: 12px;
+            font-size: 1.2em;
+            font-weight: bold;
+            border: 2px solid #2980b9;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #e0eaff, #b2d8fd 80%);
+            color: #17466e;
+            cursor: pointer;
+            box-shadow: 0 2px 7px #6bc3ff1c;
+        }
+        .btn-pedido-especial:active { border-width: 3px; }
+
+        .tabla-pedidos-especiales {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.97em;
+        }
+        .tabla-pedidos-especiales th, .tabla-pedidos-especiales td {
+            padding: 8px 5px;
+            text-align: left;
+        }
+        .tabla-pedidos-especiales th {
+            background: #3193ec;
+            color: white;
+            border-radius: 8px 8px 0 0;
+            font-weight: 600;
+            font-size: 1em;
+        }
+        .tabla-pedidos-especiales tbody tr:nth-child(even) { background: #eaf3fa; }
+        .tabla-pedidos-especiales tbody tr { transition: background 0.18s; }
+        .tabla-pedidos-especiales td {
+            vertical-align: middle;
+        }
+
+        .btn-pagar-pedido {
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 7px;
+            padding: 7px 12px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-pagar-pedido:hover {
+            background: #19984a;
+        }
+        .mesas-y-especiales {
+        display: flex;
+        flex-direction: row;
+        gap: 20px;
+        justify-content: center;
+        align-items: flex-start;
+        width: 100%;
+        margin-bottom: 32px;
+        }
+
+        .mesas-grid {
+        flex: 2 1 0;
+        min-width: 430px;
+        }
+
+        .pedido-especial-box {
+        flex: 1 1 0;
+        min-width: 230px;
+        max-width: 350px;
+        margin-top: 20px;
+        }
+
+        /* Responsive para móviles */
+        @media (max-width: 1100px) {
+        .mesas-y-especiales {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 24px;
+        }
+        .mesas-grid, .pedido-especial-box {
+            min-width: unset;
+            max-width: unset;
+            width: 100%;
+            
+        }
+        }
+
+        .pedidos-especiales-lateral {
+            flex-direction: row;
+            justify-content: center;
+            gap: 18px;
+            min-width: unset;
+            max-width: unset;
+        }
+
+        /* Responsive */
+        @media (max-width: 1100px) {
+            .container, .reports-section, .db-actions, .resumen-pedidos {
+                padding: 16px;
+                max-width: 99vw;
+            }
+            .db-actions {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+        @media (max-width: 900px) {
+            .mesas-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+        @media (max-width: 700px) {
+            .reports-section h2, .resumen-pedidos h2 {
+                font-size: 1.13em;
+                padding: 12px 0;
+            }
+            th, td {
+                padding: 8px 4px;
+                font-size: 0.92em;
+            }
+            .mesas-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        
+
+
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🍽️ Sistema de Registro Pedidos - FESTEJOS</h1>
+        <div class="date-info">
+            <span id="currentDate"></span>
+        </div>
+    </div>
+    <div id="loadingMessage" class="loading">Inicializando base de datos...</div>
+    <div id="mainApp" style="display:none;">
+        <div class="form-section">
+            <h2>💰 Configuración Inicial</h2>
+            <div class="form-group">
+                <label for="cajaApertura">Caja de Apertura (S/.):</label>
+                <input type="number" id="cajaApertura" placeholder="0.00" step="0.01">
+            </div>
+            <button class="btn" id="btnCajaApertura">Establecer Caja de Apertura</button>
+        </div>
+        <h2 style="margin-top:25px; text-align:center;">🪑 MESAS</h2>
+        <div class="mesas-y-especiales">
+            <div class="mesas-grid" id="mesasGrid"></div>
+            <div class="pedido-especial-box">
+                <button class="btn-pedido-especial" id="btnParaLlevar">
+                    🛍️<br>Para Llevar
+                </button>
+                <table class="tabla-pedidos-especiales" id="tablaParaLlevar">
+                    <thead>
+                        <tr><th>Nombre</th><th>Monto</th><th>Acción</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="pedido-especial-box">
+                <button class="btn-pedido-especial" id="btnDelivery">
+                    🏍️<br>Delivery
+                </button>
+                <table class="tabla-pedidos-especiales" id="tablaDelivery">
+                    <thead>
+                        <tr><th>Nombre</th><th>Monto</th><th>Acción</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="stats-grid">
+            <div class="summary-cards">
+                <div class="summary-card efectivo">
+                    <h3>💵 Efectivo</h3>
+                    <div class="amount" id="efectivoTotal">S/ 0.00</div>
+                </div>
+                <div class="summary-card yape">
+                    <h3>📱 Yape</h3>
+                    <div class="amount" id="yapeTotal">S/ 0.00</div>
+                </div>
+                <div class="summary-card tarjeta">
+                    <h3>💳 Tarjeta</h3>
+                    <div class="amount" id="tarjetaTotal">S/ 0.00</div>
+                </div>
+                <div class="summary-card total-dia">
+                    <h3>🪙 Total del Día</h3>
+                    <div class="amount" id="totalDia">S/ 0.00</div>
+                </div>
+                <div class="summary-card ganancia">
+                    <h3>📊 Ganancia</h3>
+                    <div class="amount" id="ganancia">S/ 0.00</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+<div id="mesaModal" style="display:none; position:fixed; z-index:3000; left:0; top:0; width:100vw; height:100vh; background:rgba(0,0,0,0.27); align-items:center; justify-content:center;">
+    <div id="mesaModalContent" style="background:#fff; padding:30px 24px; border-radius:16px; min-width:310px; min-height:150px; box-shadow:0 8px 40px rgba(52,52,52,0.16); position:relative;">
+    </div>
+</div>
+<div class="resumen-pagados-section">
+  <h2 style="margin:20px 0 10px 0; font-size:1.3em">🧾 Resumen de pedidos pagados</h2>
+  <div id="resumenPagadosTable"></div>
+</div>
+<div class="reports-section">
+    <h2>📊 Reportes</h2>
+    <div class="date-filter">
+        <div>
+            <label for="fechaInicio">Fecha Inicio:</label>
+            <input id="fechaInicio" type="date" />
+        </div>
+        <div>
+            <label for="fechaFin">Fecha Fin:</label>
+            <input id="fechaFin" type="date" />
+        </div>
+        <button class="btn-secondary" id="btnGenerarReporte">Generar Reporte</button>
+    </div>
+    <div id="tablaReporte"></div>
+</div>
+<div class="db-actions">
+    <button class="btn-database" id="btnExportarBD">Exportar BD</button>
+    <button class="btn-database" id="btnImportarBD">Importar BD</button>
+    <button class="btn-database" id="btnLimpiarBD">Limpiar BD</button>
+    <input type="file" id="fileImportarBD" style="display:none;" accept=".json" />
+</div>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log("Service Worker registrado", reg.scope))
+      .catch(err => console.error("Error registrando Service Worker:", err));
+  });
+}
+</script>
+
+<script>
+/* --------- Dexie DB setup --------- */
+const catalogo = {
+  menu:         { nombre: "Menú", precio: 13 },
+  sopa:         { nombre: "Sopa", precio: 6 },
+  taper:        { nombre: "Taper (para llevar/delivery)", precio: 1 },
+  ceviches: [
+    { nombre: "Ceviche de pescado", precio: 17 },
+    { nombre: "Ceviche mixto", precio: 24 },
+    { nombre: "Leche de tigre", precio: 19 },
+    { nombre: "Ceviche + chicharrón de pota", precio: 20 }
+  ],
+  chicharrones: [
+    { nombre: "Chicharrón de pota", precio: 28 },
+    { nombre: "Chicharrón de pescado", precio: 26 },
+    { nombre: "Chicharrón de langostino", precio: 28 },
+    { nombre: "Chicharrón de calamar", precio: 27 },
+    { nombre: "Chicharrón de trucha", precio: 26 },
+    { nombre: "Jalea mixta real", precio: 32 },
+    { nombre: "Jalea de pescado", precio: 28 }
+  ],
+  arroces: [
+    { nombre: "Arroz con mariscos", precio: 19 },
+    { nombre: "Arroz chaufa de pescado", precio: 17 },
+    { nombre: "Chaufa de mariscos", precio: 19 },
+    { nombre: "Chaufa mixto", precio: 21 },
+    { nombre: "Arroz tapado de pescado", precio: 15 }
+  ],
+  sudados: [
+    { nombre: "Sudado de pescado", precio: 20 },
+    { nombre: "Parihuela", precio: 24 }
+  ],
+  sopas: [
+    { nombre: "Sopa especial", precio: 10 },
+    { nombre: "Aguadito", precio: 8 }
+  ],
+  bebidas: [
+    { nombre: "Gaseosa personal", precio: 5 },
+    { nombre: "Gaseosa litro", precio: 10 },
+    { nombre: "Cerveza personal", precio: 8 },
+    { nombre: "Cerveza grande", precio: 16 },
+    { nombre: "Chicha morada vaso", precio: 3 },
+    { nombre: "Chicha morada jarra", precio: 12 },
+    { nombre: "Agua", precio: 2 }
+  ],
+  agregados: [
+    { nombre: "Yuca frita", precio: 7 },
+    { nombre: "Papa frita", precio: 7 },
+    { nombre: "Arroz", precio: 3 }
+  ]
+};
+
+const db = new Dexie("FestejosDB");
+db.version(3).stores({
+    pedidos: "++id,fecha,hora,mesa,monto,tipo_pedido,tipo_pago,pagado,estado,timestamp,nombre,abonos",
+    configuracion: "++id,fecha,caja_apertura,cerrada,fecha_cierre"
+});
+
+const TOTAL_MESAS = 24;
+const MESA_ESTADOS = { LIBRE: 'libre', OCUPADA: 'ocupada', PARCIAL: 'parcial' };
+
+async function initApp() {
+    document.getElementById('loadingMessage').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+    setupEventListeners();
+    setCurrentDate();
+    await renderMesas();
+    await updateStats();
+    await updateResumenPagadosTable();
+    await loadCajaApertura();
+    await renderPedidosEspeciales();
+}
+function setCurrentDate() {
+    const now = new Date();
+    const dateString = now.toLocaleDateString('es-PE', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+    document.getElementById('currentDate').textContent = dateString;
+}
+function showMessage(msg, type = 'success') {
+    let msgDiv = document.createElement('div');
+    msgDiv.className = type;
+    msgDiv.textContent = msg;
+    document.body.appendChild(msgDiv);
+    setTimeout(() => { msgDiv.remove(); }, 3500);
+}
+
+async function cerrarCajaAnteriorSiCorresponde() {
+    const hoy = (new Date()).toISOString().slice(0, 10);
+    const ultimaCaja = await db.configuracion.orderBy('fecha').last();
+    if (ultimaCaja && ultimaCaja.fecha !== hoy && !ultimaCaja.cerrada) {
+        await db.configuracion.update(ultimaCaja.id, {
+            cerrada: 1,
+            fecha_cierre: hoy
+        });
+        showMessage('La caja del día ' + ultimaCaja.fecha + ' fue cerrada automáticamente.', 'success');
+    }
+}
+
+/* ========== MESAS VISUAL GRID ========== */
+async function renderMesas() {
+    const grid = document.getElementById('mesasGrid');
+    grid.innerHTML = '';
+    const today = new Date().toISOString().split('T')[0];
+    let pedidosArr = await db.pedidos.where("fecha").equals(today).toArray();
+    let pedidos = {};
+    pedidosArr.forEach(p => {
+        if (!pedidos[p.mesa]) pedidos[p.mesa] = [];
+        pedidos[p.mesa].push(p);
+    });
+    for (let n = 1; n <= TOTAL_MESAS; n++) {
+        const mesaPedidos = pedidos[n] || [];
+        let estado = MESA_ESTADOS.LIBRE, monto = 0, pagado = 0, idPedido = null;
+        if (mesaPedidos.length > 0) {
+            const pedidoActivo = mesaPedidos.find(p => (p.monto > p.pagado));
+            if (pedidoActivo) {
+                estado = pedidoActivo.pagado === 0 ? MESA_ESTADOS.OCUPADA : MESA_ESTADOS.PARCIAL;
+                monto = pedidoActivo.monto;
+                pagado = pedidoActivo.pagado;
+                idPedido = pedidoActivo.id;
+            }
+        }
+        const btn = document.createElement('button');
+        btn.className = 'mesa-btn ' + (estado === MESA_ESTADOS.LIBRE ? 'mesa-libre' : estado === MESA_ESTADOS.OCUPADA ? 'mesa-ocupada' : 'mesa-parcial');
+        btn.innerHTML = `<div class="mesa-num">M${n.toString().padStart(2, '0')}</div>`
+            + (estado !== MESA_ESTADOS.LIBRE ? `<span class="mesa-monto">S/ ${monto.toFixed(2)}<br><span style="font-size:0.9em">${pagado > 0 ? `Pagado: S/ ${pagado.toFixed(2)}` : ''}</span></span>` : '');
+        btn.onclick = () => clickMesa(n, idPedido, estado, monto, pagado);
+        grid.appendChild(btn);
+    }
+}
+
+/* --------- Modal --------- */
+function showMesaModal(html) {
+    document.getElementById('mesaModalContent').innerHTML = html;
+    document.getElementById('mesaModal').style.display = 'flex';
+}
+function closeMesaModal() { document.getElementById('mesaModal').style.display = 'none'; }
+document.getElementById('mesaModal').onclick = function(e) { if (e.target === this) closeMesaModal(); };
+
+/* --------- Pedidos especiales --------- */
+document.getElementById('btnParaLlevar').onclick = () => showPedidoEspecialModal('para llevar');
+document.getElementById('btnDelivery').onclick = () => showPedidoEspecialModal('delivery');
+
+function showPedidoEspecialModal(tipoPedido) {
+    showMesaModal(`
+        <h3>Nuevo pedido: ${tipoPedido === 'delivery' ? 'Delivery 🏍️' : 'Para Llevar 🛍️'}</h3>
+        <form id="nuevoPedidoEspecialForm" autocomplete="off">
+            <label>Nombre:<br>
+                <input type="text" name="nombre" required style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+            </label><br>
+            <label>Monto Total (S/.):<br>
+                <input type="number" min="0.01" step="0.01" name="monto" required style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+            </label><br>
+            <button type="submit" class="btn" style="margin-top:12px;">Registrar Pedido</button>
+            <button type="button" onclick="closeMesaModal()" class="btn-secondary" style="margin-top:12px;">Cancelar</button>
+        </form>
+    `);
+    document.getElementById('nuevoPedidoEspecialForm').onsubmit = async function(e) {
+        e.preventDefault();
+        const nombre = this.nombre.value.trim() || '-';
+        const monto = parseFloat(this.monto.value);
+        await crearPedidoEspecial(tipoPedido, nombre, monto);
+        closeMesaModal();
+    };
+}
+async function crearPedidoEspecial(tipoPedido, nombre, monto) {
+    if (isNaN(monto) || monto <= 0) return;
+    const fecha = new Date().toISOString().split('T')[0];
+    const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+    const timestamp = new Date().toISOString();
+    await db.pedidos.add({
+        fecha, hora, mesa: 0, monto,
+        tipo_pedido: tipoPedido, tipo_pago: '', pagado: 0,
+        estado: "ocupada", timestamp, nombre
+    });
+    await renderPedidosEspeciales();
+    await updateStats();
+    await updateResumenPagadosTable();
+    showMessage('Pedido registrado como "' + tipoPedido + '"');
+}
+async function renderPedidosEspeciales() {
+    await renderPedidosEspecialTipo('para llevar', 'tablaParaLlevar');
+    await renderPedidosEspecialTipo('delivery', 'tablaDelivery');
+}
+async function renderPedidosEspecialTipo(tipoPedido, tablaId) {
+    const cont = document.getElementById(tablaId).querySelector('tbody');
+    cont.innerHTML = '';
+    const today = new Date().toISOString().split('T')[0];
+    const pedidos = await db.pedidos
+        .where({ fecha: today, mesa: 0, tipo_pedido: tipoPedido, estado: "ocupada" }).toArray();
+    for (const p of pedidos) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${p.nombre || '-'}</td>
+            <td>S/ ${Number(p.monto).toFixed(2)}</td>
+            <td>
+                <button class="btn-pagar-pedido" title="Marcar como pagado" onclick="abrirPagoPedidoEspecial(${p.id}, '${tipoPedido}')">💸 Pagar</button>
+            </td>
+        `;
+        cont.appendChild(tr);
+    }
+}
+window.abrirPagoPedidoEspecial = function(idPedido, tipoPedido) {
+    showMesaModal(`
+        <h3>Pagar pedido: ${tipoPedido === 'delivery' ? 'Delivery 🏍️' : 'Para Llevar 🛍️'}</h3>
+        <form id="pagoPedidoEspecialForm" autocomplete="off">
+            <label>Medio de Pago:</label>
+            <div id="pagoBotones" style="display: flex; gap: 10px; margin: 10px 0;">
+                <button type="button" class="btn-medio btn-efectivo" data-pago="efectivo">Efectivo</button>
+                <button type="button" class="btn-medio btn-yape" data-pago="yape">Yape</button>
+                <button type="button" class="btn-medio btn-tarjeta" data-pago="tarjeta">Tarjeta</button>
+            </div>
+            <input type="hidden" name="tipo_pago" id="inputTipoPagoEspecial" required>
+            <button type="submit" class="btn" style="margin-top:12px;">Confirmar Pago</button>
+            <button type="button" onclick="closeMesaModal()" class="btn-secondary" style="margin-top:12px;">Cancelar</button>
+        </form>
+    `);
+    // JS para seleccionar botón
+    const pagoBotones = document.querySelectorAll("#pagoBotones .btn-medio");
+    const inputTipoPago = document.getElementById("inputTipoPagoEspecial");
+    pagoBotones.forEach(btn => {
+        btn.onclick = function() {
+            pagoBotones.forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            inputTipoPago.value = btn.getAttribute('data-pago');
+        };
+    });
+    // Preselecciona "efectivo"
+    pagoBotones[0].click();
+
+    document.getElementById('pagoPedidoEspecialForm').onsubmit = function(e) {
+        e.preventDefault();
+        const tipo_pago = inputTipoPago.value;
+        pagarPedidoEspecial(idPedido, tipoPedido, tipo_pago);
+        closeMesaModal();
+    };
+};
+
+// CORREGIDO: Cambia pagado: Dexie.minKey por pagado: monto
+window.pagarPedidoEspecial = async function(idPedido, tipoPedido, tipo_pago) {
+    const pedido = await db.pedidos.get(idPedido);
+    if (!pedido) return;
+    await db.pedidos.update(idPedido, {
+        pagado: pedido.monto,
+        estado: "libre",
+        tipo_pago
+    });
+    await renderPedidosEspeciales();
+    await updateStats();
+    await updateResumenPagadosTable();
+    showMessage(`Pedido de ${tipoPedido} pagado`, 'success');
+};
+
+/* -------- MESAS CRUD ---------- */
+// ---- FLATTEN del catálogo agrupado ----
+const catalogoArray = [];
+let _id = 1;
+for (const key in catalogo) {
+    if (Array.isArray(catalogo[key])) {
+        catalogo[key].forEach(prod => catalogoArray.push({ ...prod, id: _id++, categoria: key }));
+    } else if (typeof catalogo[key] === 'object') {
+        catalogoArray.push({ ...catalogo[key], id: _id++, categoria: key });
+    }
+}
+
+// ---- FUNCIÓN PRINCIPAL ----
+async function clickMesa(num, idPedido, estado, monto, pagado) {
+    // ----------- SI LA MESA ESTÁ LIBRE: NUEVO PEDIDO ----------- 
+    if (estado === MESA_ESTADOS.LIBRE) {
+        let pedidoDetalle = [];
+        let htmlForm = `
+            <h3>Nuevo pedido para Mesa ${num}</h3>
+            <form id="nuevoPedidoForm" autocomplete="off">
+                <div style="position:relative;">
+                    <label>Producto:</label>
+                    <input type="text" id="productoInput" placeholder="Escribe para buscar..." style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;" autocomplete="off">
+                    <div id="autocompleteList" class="autocomplete-items"></div>
+                </div>
+                <div style="margin-top:7px;">
+                    <label>Cantidad:</label>
+                    <input type="number" min="1" value="1" id="cantidadInput" style="width:80px;">
+                    <button type="button" id="agregarBtn" class="btn" style="margin-left:8px;padding:7px 15px;font-size:1em;">Agregar</button>
+                </div>
+                <table id="tablaPedido" style="width:100%;margin-top:14px;">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Cant.</th>
+                            <th>Precio</th>
+                            <th>Subtotal</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <label style="margin-top:12px;display:block;">
+                    <input type="checkbox" id="chkTaper" value="1" /> ¿Pedido para llevar / delivery? (S/ 1.00 x envase)
+                </label>
+                <div style="font-weight:bold; margin:10px 0;">
+                    Total: <span id="pedidoTotal">S/ 0.00</span>
+                </div>
+                <button type="submit" class="btn" style="margin-top:12px;">Registrar Pedido</button>
+                <button type="button" onclick="closeMesaModal()" class="btn-secondary" style="margin-top:12px;">Cancelar</button>
+            </form>
+            <style>
+            .autocomplete-items {
+                position: absolute; background: #fff; border: 1px solid #ccc; border-top: none; z-index: 10; max-height: 180px; overflow-y: auto;
+                width: calc(100% - 2px);
+            }
+            .autocomplete-items div {
+                padding: 8px; cursor: pointer; border-bottom: 1px solid #eee;
+            }
+            .autocomplete-items div:hover { background: #f0f0f0; }
+            </style>
+        `;
+        showMesaModal(htmlForm);
+
+        // ------- AUTOCOMPLETADO ---------
+        const productoInput = document.getElementById('productoInput');
+        const autocompleteList = document.getElementById('autocompleteList');
+        let productoSeleccionado = null;
+
+        productoInput.oninput = function() {
+            let val = this.value.trim().toLowerCase();
+            autocompleteList.innerHTML = '';
+            if (!val) return;
+            const sugerencias = catalogoArray.filter(p => p.nombre.toLowerCase().includes(val));
+            sugerencias.forEach(prod => {
+                let div = document.createElement('div');
+                div.textContent = prod.nombre + " (S/ " + prod.precio.toFixed(2) + ")";
+                div.onclick = function() {
+                    productoInput.value = prod.nombre;
+                    productoSeleccionado = prod;
+                    autocompleteList.innerHTML = '';
+                };
+                autocompleteList.appendChild(div);
+            });
+        };
+        productoInput.onblur = function() { setTimeout(() => autocompleteList.innerHTML = '', 180); };
+
+        // -------- AGREGAR PRODUCTO AL PEDIDO ---------
+        document.getElementById('agregarBtn').onclick = function() {
+            const nombre = productoInput.value.trim();
+            const cant = parseInt(document.getElementById('cantidadInput').value, 10) || 1;
+            let prod = catalogoArray.find(p => p.nombre.toLowerCase() === nombre.toLowerCase());
+            if (!prod) {
+                showMessage('Selecciona un producto válido', 'error');
+                return;
+            }
+            let existente = pedidoDetalle.find(p => p.id === prod.id);
+            if (existente) {
+                existente.cantidad += cant;
+            } else {
+                pedidoDetalle.push({ ...prod, cantidad: cant });
+            }
+            productoInput.value = '';
+            productoSeleccionado = null;
+            renderTablaPedido();
+        };
+
+        // --------- TABLA DE PRODUCTOS EN EL PEDIDO ---------
+        function renderTablaPedido() {
+            const tbody = document.getElementById('tablaPedido').querySelector('tbody');
+            tbody.innerHTML = '';
+            let total = 0;
+            pedidoDetalle.forEach((prod, idx) => {
+                let sub = prod.precio * prod.cantidad;
+                total += sub;
+                let tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${prod.nombre}</td>
+                    <td>${prod.cantidad}</td>
+                    <td>S/ ${prod.precio.toFixed(2)}</td>
+                    <td>S/ ${sub.toFixed(2)}</td>
+                    <td>
+                        <button type="button" style="color:#e74c3c;font-size:1.1em;" onclick="this.closest('tr').remove();pedidoDetalle.splice(${idx},1);renderTablaPedido();">🗑️</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            // Taper para llevar
+            if (document.getElementById('chkTaper').checked) {
+                let taperCant = pedidoDetalle.reduce((sum, item) => sum + item.cantidad, 0);
+                total += taperCant;
+            }
+            document.getElementById('pedidoTotal').innerText = "S/ " + total.toFixed(2);
+        }
+        document.getElementById('chkTaper').onchange = renderTablaPedido;
+
+        // --------- SUBMIT PEDIDO ---------
+        document.getElementById('nuevoPedidoForm').onsubmit = async function(e) {
+            e.preventDefault();
+            let detalle = [...pedidoDetalle];
+            let total = detalle.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
+            let esParaLlevar = document.getElementById('chkTaper').checked;
+            if (esParaLlevar) {
+                let taperCant = detalle.reduce((s, item) => s + item.cantidad, 0);
+                if (taperCant > 0) {
+                    total += taperCant;
+                    detalle.push({ id: "taper", nombre: "Taper (envase adicional)", precio: 1, cantidad: taperCant });
+                }
+            }
+            if (detalle.length === 0) {
+                showMessage("Debe agregar al menos un producto.", "error");
+                return;
+            }
+            await crearPedido(num, total, detalle);
+            closeMesaModal();
+        };
+        return; // ---- IMPORTANTE: salir aquí si es nuevo pedido ----
+    }
+
+    // ----------- SI LA MESA ESTÁ OCUPADA O PARCIALMENTE PAGADA ----------- 
+    let pagadoActual = pagado;
+    let abonosStr = '';
+    if (idPedido) {
+        const pedido = await db.pedidos.get(idPedido);
+        if (pedido && pedido.abonos && Array.isArray(pedido.abonos) && pedido.abonos.length) {
+            pagadoActual = pedido.abonos.reduce((sum, a) => sum + Number(a.monto), 0);
+            abonosStr = pedido.abonos.map(a =>
+                `<div style="font-size:0.97em; color:#444; margin-bottom:2px;">
+                    ${a.tipo_pago.charAt(0).toUpperCase()+a.tipo_pago.slice(1)}: S/ ${Number(a.monto).toFixed(2)}
+                </div>`
+            ).join('');
+        }
+    }
+    const saldoPendiente = monto - pagadoActual;
+    showMesaModal(`
+        <h3>Mesa ${num} (${estado === MESA_ESTADOS.OCUPADA ? 'Ocupada' : 'Pago parcial'})</h3>
+        <div><b>Monto Total:</b> S/ ${monto.toFixed(2)}</div>
+        <div><b>Pagado:</b> S/ ${pagadoActual.toFixed(2)}</div>
+        <div><b>Detalle de abonos:</b><br>${abonosStr || '<i>No hay abonos registrados</i>'}</div>
+        <div id="saldoRestante" style="margin: 8px 0 10px 0; font-weight: bold; color: #2c3e50;">
+            Saldo pendiente: S/ ${saldoPendiente.toFixed(2)}
+        </div>
+        <form id="abonoForm" autocomplete="off" style="margin-top:8px;">
+            <label>Monto a abonar:<br>
+                <input type="number" min="0.01" max="${saldoPendiente}" step="0.01" name="abono" required
+                    style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+            </label><br>
+            <label>Medio de Pago:</label>
+            <div id="pagoBotones" style="display: flex; gap: 10px; margin: 10px 0;">
+                <button type="button" class="btn-medio btn-efectivo" data-pago="efectivo">Efectivo</button>
+                <button type="button" class="btn-medio btn-yape" data-pago="yape">Yape</button>
+                <button type="button" class="btn-medio btn-tarjeta" data-pago="tarjeta">Tarjeta</button>
+            </div>
+            <input type="hidden" name="tipo_pago" id="inputTipoPagoMesa" required>
+            <button type="submit" class="btn" style="margin-top:12px;">Abonar</button>
+        </form>
+        <button class="btn-secondary" style="margin-top:10px;" onclick="editarPedidoModal(${idPedido},${num},${monto})">Editar monto</button>
+        <button class="btn-secondary" style="margin-top:10px;" onclick="anularPedido(${idPedido},${num})">Anular pedido</button>
+        <button class="btn-secondary" style="margin-top:10px;" onclick="closeMesaModal()">Cerrar</button>
+    `);
+
+    // Lógica selección de medio de pago
+    const pagoBotones = document.querySelectorAll("#pagoBotones .btn-medio");
+    const inputTipoPago = document.getElementById("inputTipoPagoMesa");
+    pagoBotones.forEach(btn => {
+        btn.onclick = function() {
+            pagoBotones.forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            inputTipoPago.value = btn.getAttribute('data-pago');
+        };
+    });
+    pagoBotones[0].click();
+
+    // Actualiza saldo restante al escribir monto
+    document.querySelector('#abonoForm input[name="abono"]').addEventListener('input', function() {
+        let val = parseFloat(this.value) || 0;
+        let saldo = saldoPendiente - val;
+        if (saldo < 0) saldo = 0;
+        document.getElementById('saldoRestante').innerHTML = `Saldo pendiente: S/ ${saldo.toFixed(2)}`;
+    });
+
+    document.getElementById('abonoForm').onsubmit = async function(e) {
+        e.preventDefault();
+        const abono = parseFloat(this.abono.value);
+        const tipo_pago = inputTipoPago.value;
+        if (!tipo_pago) {
+            alert("Debe seleccionar un medio de pago");
+            return;
+        }
+        await abonarPedido(idPedido, abono, tipo_pago, monto, pagadoActual, num);
+
+        // Verifica si ya está pagado todo
+        const pedidoActualizado = await db.pedidos.get(idPedido);
+        let pagadoTotal = 0;
+        if (pedidoActualizado && pedidoActualizado.abonos) {
+            pagadoTotal = pedidoActualizado.abonos.reduce((sum, a) => sum + Number(a.monto), 0);
+        } else {
+            pagadoTotal = pedidoActualizado ? pedidoActualizado.pagado : 0;
+        }
+        if (pagadoTotal >= monto) {
+            closeMesaModal();
+        } else {
+            await clickMesa(num, idPedido, estado, monto, pagadoTotal);
+        }
+    };
+}
+
+
+
+
+
+async function crearPedido(num, monto, detalle=[]) {
+    if (isNaN(monto) || monto <= 0) return;
+    const fecha = new Date().toISOString().split('T')[0];
+    const pedidosActivos = await db.pedidos.where({ fecha, mesa: num }).filter(p => p.estado !== "libre").toArray();
+    if (pedidosActivos.length > 0) {
+        showMessage('Ya existe un pedido activo para esta mesa hoy.', 'error');
+        return;
+    }
+    const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+    const timestamp = new Date().toISOString();
+    const tipo_pedido = "mesa";
+    await db.pedidos.add({
+        fecha, hora, mesa: num, monto, tipo_pedido, tipo_pago: '', pagado: 0, estado: "ocupada", timestamp,
+        detalle // <--- guarda el detalle completo
+    });
+    await renderMesas();
+    await updateStats();
+    await updateResumenPagadosTable();
+    showMessage('Pedido creado para mesa ' + num);
+}
+
+
+async function abonarPedido(idPedido, abono, tipo_pago, monto, pagado, num) {
+    const pedido = await db.pedidos.get(idPedido);
+    if (!pedido) { showMessage('Pedido no encontrado', 'error'); return; }
+    // Suma de abonos ya realizados
+    let abonos = pedido.abonos || [];
+    let pagadoActual = abonos.reduce((sum, a) => sum + Number(a.monto), 0);
+
+    const pendiente = pedido.monto - pagadoActual;
+    if (isNaN(abono) || abono <= 0 || abono > pendiente) {
+        showMessage(`Abono inválido. El máximo permitido es S/ ${pendiente.toFixed(2)}`, 'error');
+        return;
+    }
+    // Agrega nuevo abono
+    abonos.push({
+        monto: abono,
+        tipo_pago,
+        fecha: new Date().toISOString()
+    });
+    const pagadoNuevo = pagadoActual + abono;
+    await db.pedidos.update(idPedido, { 
+        pagado: pagadoNuevo, 
+        abonos: abonos, 
+        estado: pagadoNuevo >= pedido.monto ? "libre" : pedido.estado 
+    });
+    await renderMesas();
+    await updateStats();
+    await updateResumenPagadosTable();
+    showMessage(`Pago registrado para mesa ${num}`);
+}
+
+window.editarPedidoModal = async function(idPedido, num, monto) {
+    showMesaModal(`
+        <h3>Editar monto Mesa ${num}</h3>
+        <form id="editarPedidoForm" autocomplete="off">
+            <label>Nuevo monto:<br>
+                <input type="number" min="0.01" step="0.01" name="monto" value="${monto}" required style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+            </label><br>
+            <button type="submit" class="btn" style="margin-top:12px;">Actualizar</button>
+            <button type="button" onclick="closeMesaModal()" class="btn-secondary" style="margin-top:12px;">Cancelar</button>
+        </form>
+    `);
+    document.getElementById('editarPedidoForm').onsubmit = async function(e) {
+        e.preventDefault();
+        const nuevoMonto = parseFloat(this.monto.value);
+        await db.pedidos.update(idPedido, { monto: nuevoMonto });
+        await renderMesas();
+        await updateStats();
+        await updateResumenPagadosTable();
+        showMessage('Monto actualizado.');
+        closeMesaModal();
+    };
+};
+window.anularPedido = async function(idPedido, num) {
+    if (confirm(`¿Anular pedido de Mesa ${num}? Esta acción no se puede deshacer.`)) {
+        await db.pedidos.delete(idPedido);
+        await renderMesas();
+        await updateStats();
+        await updateResumenPagadosTable();
+        showMessage('Pedido anulado.');
+        closeMesaModal();
+    }
+};
+
+/* --------- Resumen y reportes --------- */
+async function updateResumenPagadosTable() {
+    const cont = document.getElementById('resumenPagadosTable');
+    const today = new Date().toISOString().split('T')[0];
+    const rows = await db.pedidos.where("fecha").equals(today).filter(p => (p.pagado || 0) > 0).toArray();
+    if (!rows.length) {
+        cont.innerHTML = '<div style="color:#666;padding:15px;">No hay pedidos pagados aún.</div>';
+        return;
+    }
+    cont.innerHTML = `
+        <table style="width:100%;margin-bottom:15px;">
+            <thead>
+                <tr>
+                    <th>Mesa</th>
+                    <th>Monto Total</th>
+                    <th>Pagado</th>
+                    <th>Falta</th>
+                    <th>Detalle de Pagos</th>
+                    <th>Imprimir</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rows.map(r => {
+                    let efectivo = 0, yape = 0, tarjeta = 0;
+                    if (r.abonos && Array.isArray(r.abonos)) {
+                        r.abonos.forEach(ab => {
+                            if (ab.tipo_pago === "efectivo") efectivo += Number(ab.monto) || 0;
+                            if (ab.tipo_pago === "yape") yape += Number(ab.monto) || 0;
+                            if (ab.tipo_pago === "tarjeta") tarjeta += Number(ab.monto) || 0;
+                        });
+                    } else if (r.tipo_pago) {
+                        if (r.tipo_pago === "efectivo") efectivo = Number(r.pagado) || 0;
+                        if (r.tipo_pago === "yape") yape = Number(r.pagado) || 0;
+                        if (r.tipo_pago === "tarjeta") tarjeta = Number(r.pagado) || 0;
+                    }
+                    let detalle = [
+                        efectivo ? `Efectivo: S/ ${efectivo.toFixed(2)}` : '',
+                        yape ? `Yape: S/ ${yape.toFixed(2)}` : '',
+                        tarjeta ? `Tarjeta: S/ ${tarjeta.toFixed(2)}` : ''
+                    ].filter(Boolean).join("<br>");
+                    return `
+                    <tr>
+                        <td style="text-align:center;">
+                            ${r.mesa === 0
+                                ? (r.tipo_pedido === "para llevar" ? "Para Llevar" :
+                                    r.tipo_pedido === "delivery" ? "Delivery" : "Especial")
+                                : "M" + r.mesa.toString().padStart(2, '0')}
+                        </td>
+                        <td>S/ ${Number(r.monto).toFixed(2)}</td>
+                        <td>S/ ${Number(r.pagado).toFixed(2)}</td>
+                        <td>S/ ${(Number(r.monto) - Number(r.pagado)).toFixed(2)}</td>
+                        <td>${detalle || '-'}</td>
+                        <td>
+                            <button class="btn-secondary" style="padding:7px 14px;font-size:0.97em"
+                                onclick="imprimirDetalleAbonos(${r.id})">
+                                🖨️ Imprimir
+                            </button>
+                        </td>
+                    </tr>
+                `}).join('')}
+            </tbody>
+        </table>
+    `;
+}
+window.imprimirDetalleAbonos = async function(idPedido) {
+    const pedido = await db.pedidos.get(idPedido);
+    if (!pedido) return alert('Pedido no encontrado');
+    let nombre = pedido.nombre || '-';
+    let mesa = pedido.mesa === 0
+        ? (pedido.tipo_pedido === "para llevar" ? "Para Llevar"
+            : pedido.tipo_pedido === "delivery" ? "Delivery" : "Especial")
+        : "M" + pedido.mesa.toString().padStart(2, '0');
+
+    let html = `
+    <div style="font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;min-width:350px;">
+        <h2 style="text-align:center;margin-bottom:12px;">Detalle de Pedido</h2>
+        <b>Mesa/Pedido:</b> ${mesa} <br>
+        <b>Nombre:</b> ${nombre} <br>
+        <b>Monto Total:</b> S/ ${Number(pedido.monto).toFixed(2)}<br>
+        <b>Pagado:</b> S/ ${Number(pedido.pagado).toFixed(2)}<br>
+        <b>Falta:</b> S/ ${(Number(pedido.monto) - Number(pedido.pagado)).toFixed(2)}<br>
+        <hr style="margin:10px 0;">
+        <b>Abonos realizados:</b>
+        <table border="1" cellpadding="7" cellspacing="0" style="width:100%;margin-top:8px;font-size:1em;">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Monto</th>
+                    <th>Medio</th>
+                    <th>Fecha/Hora</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${(pedido.abonos || []).map((a, i) => `
+                    <tr>
+                        <td style="text-align:center">${i + 1}</td>
+                        <td>S/ ${Number(a.monto).toFixed(2)}</td>
+                        <td>${a.tipo_pago.charAt(0).toUpperCase() + a.tipo_pago.slice(1)}</td>
+                        <td>${new Date(a.fecha).toLocaleString('es-PE')}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    </div>
+    `;
+    // Abrir en nueva ventana lista para imprimir
+    let w = window.open('', '_blank', 'width=500,height=700');
+    w.document.write(`
+        <html><head><title>Detalle de Abonos</title></head><body>${html}
+        <br><button onclick="window.print();">Imprimir</button>
+        </body></html>
+    `);
+    w.document.close();
+};
+
+async function updateStats() {
+    const today = new Date().toISOString().split('T')[0];
+    const paymentTotals = { efectivo: 0, yape: 0, tarjeta: 0 };
+    const rows = await db.pedidos.where("fecha").equals(today).toArray();
+    for (const row of rows) {
+        if (row.abonos && Array.isArray(row.abonos)) {
+            row.abonos.forEach(ab => {
+                if (ab.tipo_pago && paymentTotals[ab.tipo_pago] !== undefined) {
+                    paymentTotals[ab.tipo_pago] += Number(ab.monto) || 0;
+                }
+            });
+        } else if (row.tipo_pago && paymentTotals[row.tipo_pago] !== undefined) {
+            // Compatibilidad con pedidos antiguos (sin abonos)
+            paymentTotals[row.tipo_pago] += Number(row.pagado) || 0;
+        }
+    }
+    const totalDia = paymentTotals.efectivo + paymentTotals.yape + paymentTotals.tarjeta;
+    document.getElementById('efectivoTotal').textContent = `S/ ${paymentTotals.efectivo.toFixed(2)}`;
+    document.getElementById('yapeTotal').textContent = `S/ ${paymentTotals.yape.toFixed(2)}`;
+    document.getElementById('tarjetaTotal').textContent = `S/ ${paymentTotals.tarjeta.toFixed(2)}`;
+    document.getElementById('totalDia').textContent = `S/ ${totalDia.toFixed(2)}`;
+    // Leer caja de apertura del día
+    let cajaApertura = 0;
+    const conf = await db.configuracion.where({ fecha: today }).first();
+    if (conf) cajaApertura = Number(conf.caja_apertura) || 0;
+    const ganancia = totalDia - cajaApertura;
+    document.getElementById('ganancia').textContent = `S/ ${ganancia.toFixed(2)}`;
+}
+
+async function loadCajaApertura() {
+    const today = new Date().toISOString().split('T')[0];
+    const conf = await db.configuracion.where({ fecha: today }).first();
+    if (conf) document.getElementById('cajaApertura').value = conf.caja_apertura;
+}
+async function setCajaApertura() {
+    const amount = parseFloat(document.getElementById('cajaApertura').value);
+    if (isNaN(amount) || amount < 0) { showMessage('Por favor, ingrese un monto válido', 'error'); return; }
+    const today = new Date().toISOString().split('T')[0];
+    await db.configuracion.where({ fecha: today }).delete();
+    await db.configuracion.add({ fecha: today, caja_apertura: amount });
+    await updateStats();
+    showMessage(`Caja de apertura establecida: S/ ${amount.toFixed(2)}`, 'success');
+}
+function setupEventListeners() {
+    document.getElementById('btnCajaApertura').addEventListener('click', setCajaApertura);
+}
+document.getElementById('btnGenerarReporte').onclick = async function() {
+    const inicio = document.getElementById('fechaInicio').value;
+    const fin = document.getElementById('fechaFin').value;
+    if (!inicio || !fin) {
+        showMessage('Debe seleccionar ambas fechas', 'error');
+        return;
+    }
+    let html = `<table><thead>
+        <tr><th>Fecha</th><th>Hora</th><th>Mesa</th><th>Tipo Pedido</th><th>Tipo Pago</th><th>Monto</th></tr>
+    </thead><tbody>`;
+    const rows = await db.pedidos
+        .where("fecha").between(inicio, fin, true, true)
+        .filter(p => p.pagado >= p.monto).toArray();
+    for (const p of rows) {
+        html += `<tr>
+            <td>${p.fecha}</td>
+            <td>${p.hora}</td>
+            <td>
+                ${p.mesa === 0
+                    ? (p.tipo_pedido === "para llevar" ? "Para Llevar" :
+                        p.tipo_pedido === "delivery" ? "Delivery" : "Especial")
+                    : "M" + p.mesa.toString().padStart(2, '0')}
+            </td>
+            <td>${p.tipo_pedido || '-'}</td>
+            <td>${p.tipo_pago}</td>
+            <td>S/ ${Number(p.monto).toFixed(2)}</td>
+        </tr>`;
+    }
+    html += '</tbody></table>';
+    document.getElementById('tablaReporte').innerHTML = html;
+};
+// Deja SOLO este window.onload para evitar duplicados
+window.onload = async () => {
+    const today = (new Date()).toISOString().slice(0, 10);
+    document.getElementById('fechaInicio').value = today;
+    document.getElementById('fechaFin').value = today;
+    await cerrarCajaAnteriorSiCorresponde();
+    await initApp();
+};
+
+/* --------- Exportar/Importar/Limpiar BD --------- */
+document.getElementById('btnExportarBD').onclick = async function() {
+    const data = {
+        pedidos: await db.pedidos.toArray(),
+        configuracion: await db.configuracion.toArray()
+    };
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'restaurantDB.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+};
+document.getElementById('btnImportarBD').onclick = function() {
+    document.getElementById('fileImportarBD').click();
+};
+document.getElementById('fileImportarBD').onchange = async function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async function(event) {
+        try {
+            const data = JSON.parse(event.target.result);
+            await db.pedidos.clear();
+            await db.configuracion.clear();
+            await db.pedidos.bulkAdd(data.pedidos || []);
+            await db.configuracion.bulkAdd(data.configuracion || []);
+            await renderMesas();
+            await updateStats();
+            await updateResumenPagadosTable();
+            showMessage('Base de datos importada exitosamente');
+        } catch (err) {
+            showMessage('Error importando la base de datos', 'error');
+        }
+    };
+    reader.readAsText(file);
+};
+document.getElementById('btnLimpiarBD').onclick = async function() {
+    if (!confirm('¿Seguro que deseas limpiar toda la base de datos? Esta acción NO se puede deshacer.')) return;
+    await db.pedidos.clear();
+    await db.configuracion.clear();
+    await renderMesas();
+    await updateStats();
+    await updateResumenPagadosTable();
+    showMessage('Base de datos limpiada');
+};
+
+</script>
+</body>
+</html>
