@@ -1,0 +1,835 @@
+/* --------- Dexie DB setup --------- */
+const catalogo = {
+  menu:         { nombre: "Menú", precio: 13 },
+  sopa:         { nombre: "Sopa", precio: 6 },
+  taper:        { nombre: "Taper (para llevar/delivery)", precio: 1 },
+  ceviches: [
+    { nombre: "Ceviche de pescado", precio: 17 },
+    { nombre: "Ceviche mixto", precio: 24 },
+    { nombre: "Leche de tigre", precio: 19 },
+    { nombre: "Ceviche + chicharrón de pota", precio: 20 }
+  ],
+  chicharrones: [
+    { nombre: "Chicharrón de pota", precio: 28 },
+    { nombre: "Chicharrón de pescado", precio: 26 },
+    { nombre: "Chicharrón de langostino", precio: 28 },
+    { nombre: "Chicharrón de calamar", precio: 27 },
+    { nombre: "Chicharrón de trucha", precio: 26 },
+    { nombre: "Jalea mixta real", precio: 32 },
+    { nombre: "Jalea de pescado", precio: 28 }
+  ],
+  arroces: [
+    { nombre: "Arroz con mariscos", precio: 19 },
+    { nombre: "Arroz chaufa de pescado", precio: 17 },
+    { nombre: "Chaufa de mariscos", precio: 19 },
+    { nombre: "Chaufa mixto", precio: 21 },
+    { nombre: "Arroz tapado de pescado", precio: 15 }
+  ],
+  sudados: [
+    { nombre: "Sudado de pescado", precio: 20 },
+    { nombre: "Parihuela", precio: 24 }
+  ],
+  sopas: [
+    { nombre: "Sopa especial", precio: 10 },
+    { nombre: "Aguadito", precio: 8 }
+  ],
+  bebidas: [
+    { nombre: "Gaseosa personal", precio: 5 },
+    { nombre: "Gaseosa litro", precio: 10 },
+    { nombre: "Cerveza personal", precio: 8 },
+    { nombre: "Cerveza grande", precio: 16 },
+    { nombre: "Chicha morada vaso", precio: 3 },
+    { nombre: "Chicha morada jarra", precio: 12 },
+    { nombre: "Agua", precio: 2 }
+  ],
+  agregados: [
+    { nombre: "Yuca frita", precio: 7 },
+    { nombre: "Papa frita", precio: 7 },
+    { nombre: "Arroz", precio: 3 }
+  ]
+};
+
+const db = new Dexie("FestejosDB");
+db.version(3).stores({
+    pedidos: "++id,fecha,hora,mesa,monto,tipo_pedido,tipo_pago,pagado,estado,timestamp,nombre,abonos",
+    configuracion: "++id,fecha,caja_apertura,cerrada,fecha_cierre"
+});
+
+const TOTAL_MESAS = 24;
+const MESA_ESTADOS = { LIBRE: 'libre', OCUPADA: 'ocupada', PARCIAL: 'parcial' };
+
+async function initApp() {
+    document.getElementById('loadingMessage').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+    setupEventListeners();
+    setCurrentDate();
+    await renderMesas();
+    await updateStats();
+    await updateResumenPagadosTable();
+    await loadCajaApertura();
+    await renderPedidosEspeciales();
+}
+function setCurrentDate() {
+    const now = new Date();
+    const dateString = now.toLocaleDateString('es-PE', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+    document.getElementById('currentDate').textContent = dateString;
+}
+function showMessage(msg, type = 'success') {
+    let msgDiv = document.createElement('div');
+    msgDiv.className = type;
+    msgDiv.textContent = msg;
+    document.body.appendChild(msgDiv);
+    setTimeout(() => { msgDiv.remove(); }, 3500);
+}
+
+async function cerrarCajaAnteriorSiCorresponde() {
+    const hoy = (new Date()).toISOString().slice(0, 10);
+    const ultimaCaja = await db.configuracion.orderBy('fecha').last();
+    if (ultimaCaja && ultimaCaja.fecha !== hoy && !ultimaCaja.cerrada) {
+        await db.configuracion.update(ultimaCaja.id, {
+            cerrada: 1,
+            fecha_cierre: hoy
+        });
+        showMessage('La caja del día ' + ultimaCaja.fecha + ' fue cerrada automáticamente.', 'success');
+    }
+}
+
+/* ========== MESAS VISUAL GRID ========== */
+async function renderMesas() {
+    const grid = document.getElementById('mesasGrid');
+    grid.innerHTML = '';
+    const today = new Date().toISOString().split('T')[0];
+    let pedidosArr = await db.pedidos.where("fecha").equals(today).toArray();
+    let pedidos = {};
+    pedidosArr.forEach(p => {
+        if (!pedidos[p.mesa]) pedidos[p.mesa] = [];
+        pedidos[p.mesa].push(p);
+    });
+    for (let n = 1; n <= TOTAL_MESAS; n++) {
+        const mesaPedidos = pedidos[n] || [];
+        let estado = MESA_ESTADOS.LIBRE, monto = 0, pagado = 0, idPedido = null;
+        if (mesaPedidos.length > 0) {
+            const pedidoActivo = mesaPedidos.find(p => (p.monto > p.pagado));
+            if (pedidoActivo) {
+                estado = pedidoActivo.pagado === 0 ? MESA_ESTADOS.OCUPADA : MESA_ESTADOS.PARCIAL;
+                monto = pedidoActivo.monto;
+                pagado = pedidoActivo.pagado;
+                idPedido = pedidoActivo.id;
+            }
+        }
+        const btn = document.createElement('button');
+        btn.className = 'mesa-btn ' + (estado === MESA_ESTADOS.LIBRE ? 'mesa-libre' : estado === MESA_ESTADOS.OCUPADA ? 'mesa-ocupada' : 'mesa-parcial');
+        btn.innerHTML = `<div class="mesa-num">M${n.toString().padStart(2, '0')}</div>`
+            + (estado !== MESA_ESTADOS.LIBRE ? `<span class="mesa-monto">S/ ${monto.toFixed(2)}<br><span style="font-size:0.9em">${pagado > 0 ? `Pagado: S/ ${pagado.toFixed(2)}` : ''}</span></span>` : '');
+        btn.onclick = () => clickMesa(n, idPedido, estado, monto, pagado);
+        grid.appendChild(btn);
+    }
+}
+
+/* --------- Modal --------- */
+function showMesaModal(html) {
+    document.getElementById('mesaModalContent').innerHTML = html;
+    document.getElementById('mesaModal').style.display = 'flex';
+}
+function closeMesaModal() { document.getElementById('mesaModal').style.display = 'none'; }
+document.getElementById('mesaModal').onclick = function(e) { if (e.target === this) closeMesaModal(); };
+
+/* --------- Pedidos especiales --------- */
+document.getElementById('btnParaLlevar').onclick = () => showPedidoEspecialModal('para llevar');
+document.getElementById('btnDelivery').onclick = () => showPedidoEspecialModal('delivery');
+
+function showPedidoEspecialModal(tipoPedido) {
+    showMesaModal(`
+        <h3>Nuevo pedido: ${tipoPedido === 'delivery' ? 'Delivery 🏍️' : 'Para Llevar 🛍️'}</h3>
+        <form id="nuevoPedidoEspecialForm" autocomplete="off">
+            <label>Nombre:<br>
+                <input type="text" name="nombre" required style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+            </label><br>
+            <label>Monto Total (S/.):<br>
+                <input type="number" min="0.01" step="0.01" name="monto" required style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+            </label><br>
+            <button type="submit" class="btn" style="margin-top:12px;">Registrar Pedido</button>
+            <button type="button" onclick="closeMesaModal()" class="btn-secondary" style="margin-top:12px;">Cancelar</button>
+        </form>
+    `);
+    document.getElementById('nuevoPedidoEspecialForm').onsubmit = async function(e) {
+        e.preventDefault();
+        const nombre = this.nombre.value.trim() || '-';
+        const monto = parseFloat(this.monto.value);
+        await crearPedidoEspecial(tipoPedido, nombre, monto);
+        closeMesaModal();
+    };
+}
+async function crearPedidoEspecial(tipoPedido, nombre, monto) {
+    if (isNaN(monto) || monto <= 0) return;
+    const fecha = new Date().toISOString().split('T')[0];
+    const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+    const timestamp = new Date().toISOString();
+    await db.pedidos.add({
+        fecha, hora, mesa: 0, monto,
+        tipo_pedido: tipoPedido, tipo_pago: '', pagado: 0,
+        estado: "ocupada", timestamp, nombre
+    });
+    await renderPedidosEspeciales();
+    await updateStats();
+    await updateResumenPagadosTable();
+    showMessage('Pedido registrado como "' + tipoPedido + '"');
+}
+async function renderPedidosEspeciales() {
+    await renderPedidosEspecialTipo('para llevar', 'tablaParaLlevar');
+    await renderPedidosEspecialTipo('delivery', 'tablaDelivery');
+}
+async function renderPedidosEspecialTipo(tipoPedido, tablaId) {
+    const cont = document.getElementById(tablaId).querySelector('tbody');
+    cont.innerHTML = '';
+    const today = new Date().toISOString().split('T')[0];
+    const pedidos = await db.pedidos
+        .where({ fecha: today, mesa: 0, tipo_pedido: tipoPedido, estado: "ocupada" }).toArray();
+    for (const p of pedidos) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${p.nombre || '-'}</td>
+            <td>S/ ${Number(p.monto).toFixed(2)}</td>
+            <td>
+                <button class="btn-pagar-pedido" title="Marcar como pagado" onclick="abrirPagoPedidoEspecial(${p.id}, '${tipoPedido}')">💸 Pagar</button>
+            </td>
+        `;
+        cont.appendChild(tr);
+    }
+}
+window.abrirPagoPedidoEspecial = function(idPedido, tipoPedido) {
+    showMesaModal(`
+        <h3>Pagar pedido: ${tipoPedido === 'delivery' ? 'Delivery 🏍️' : 'Para Llevar 🛍️'}</h3>
+        <form id="pagoPedidoEspecialForm" autocomplete="off">
+            <label>Medio de Pago:</label>
+            <div id="pagoBotones" style="display: flex; gap: 10px; margin: 10px 0;">
+                <button type="button" class="btn-medio btn-efectivo" data-pago="efectivo">Efectivo</button>
+                <button type="button" class="btn-medio btn-yape" data-pago="yape">Yape</button>
+                <button type="button" class="btn-medio btn-tarjeta" data-pago="tarjeta">Tarjeta</button>
+            </div>
+            <input type="hidden" name="tipo_pago" id="inputTipoPagoEspecial" required>
+            <button type="submit" class="btn" style="margin-top:12px;">Confirmar Pago</button>
+            <button type="button" onclick="closeMesaModal()" class="btn-secondary" style="margin-top:12px;">Cancelar</button>
+        </form>
+    `);
+    // JS para seleccionar botón
+    const pagoBotones = document.querySelectorAll("#pagoBotones .btn-medio");
+    const inputTipoPago = document.getElementById("inputTipoPagoEspecial");
+    pagoBotones.forEach(btn => {
+        btn.onclick = function() {
+            pagoBotones.forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            inputTipoPago.value = btn.getAttribute('data-pago');
+        };
+    });
+    // Preselecciona "efectivo"
+    pagoBotones[0].click();
+
+    document.getElementById('pagoPedidoEspecialForm').onsubmit = function(e) {
+        e.preventDefault();
+        const tipo_pago = inputTipoPago.value;
+        pagarPedidoEspecial(idPedido, tipoPedido, tipo_pago);
+        closeMesaModal();
+    };
+};
+
+// CORREGIDO: Cambia pagado: Dexie.minKey por pagado: monto
+window.pagarPedidoEspecial = async function(idPedido, tipoPedido, tipo_pago) {
+    const pedido = await db.pedidos.get(idPedido);
+    if (!pedido) return;
+    await db.pedidos.update(idPedido, {
+        pagado: pedido.monto,
+        estado: "libre",
+        tipo_pago
+    });
+    await renderPedidosEspeciales();
+    await updateStats();
+    await updateResumenPagadosTable();
+    showMessage(`Pedido de ${tipoPedido} pagado`, 'success');
+};
+
+/* -------- MESAS CRUD ---------- */
+// ---- FLATTEN del catálogo agrupado ----
+const catalogoArray = [];
+let _id = 1;
+for (const key in catalogo) {
+    if (Array.isArray(catalogo[key])) {
+        catalogo[key].forEach(prod => catalogoArray.push({ ...prod, id: _id++, categoria: key }));
+    } else if (typeof catalogo[key] === 'object') {
+        catalogoArray.push({ ...catalogo[key], id: _id++, categoria: key });
+    }
+}
+
+// ---- FUNCIÓN PRINCIPAL ----
+async function clickMesa(num, idPedido, estado, monto, pagado) {
+    // ----------- SI LA MESA ESTÁ LIBRE: NUEVO PEDIDO ----------- 
+    if (estado === MESA_ESTADOS.LIBRE) {
+        let pedidoDetalle = [];
+        let htmlForm = `
+            <h3>Nuevo pedido para Mesa <span id="mesa-num"></span></h3>
+            <form id="nuevoPedidoForm" autocomplete="off" style="margin:0">
+                <div class="pedido-row">
+                    <div class="pedido-col producto">
+                        <label for="productoInput">Producto:</label>
+                        <input type="text" id="productoInput" placeholder="Escribe para buscar..." autocomplete="off" />
+                        <div id="autocompleteList" class="autocomplete-items"></div>
+                    </div>
+                    <div class="pedido-col cantidad">
+                        <label for="cantidadInput">Cantidad:</label>
+                        <input type="number" id="cantidadInput" min="1" value="1" />
+                    </div>
+                    <div class="pedido-col agregar">
+                        <button type="button" id="agregarBtn" class="btn-agregar">+ Agregar</button>
+                    </div>
+                </div>
+                <div class="pedido-tabla-wrap">
+                    <table id="tablaPedido">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Cant.</th>
+                                <th>Precio</th>
+                                <th>Subtotal</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="pedido-llevar-row">
+                    <input type="checkbox" id="chkTaper" value="1" />
+                    <label for="chkTaper">¿Pedido para llevar / delivery? <span class="taper-info">(S/ 1.00 x envase)</span></label>
+                </div>
+                <div class="pedido-total-row">
+                    <span>Total:</span>
+                    <span id="pedidoTotal" class="pedido-total-valor">S/ 0.00</span>
+                </div>
+                <button type="submit" class="btn-registro">Registrar Pedido</button>
+                <button type="button" onclick="closeMesaModal()" class="btn-cancelar">Cancelar</button>
+            </form>
+        `;
+        showMesaModal(htmlForm);
+
+        // ------- AUTOCOMPLETADO ---------
+        const productoInput = document.getElementById('productoInput');
+        const autocompleteList = document.getElementById('autocompleteList');
+        let productoSeleccionado = null;
+
+        productoInput.oninput = function() {
+            let val = this.value.trim().toLowerCase();
+            autocompleteList.innerHTML = '';
+            if (!val) return;
+            const sugerencias = catalogoArray.filter(p => p.nombre.toLowerCase().includes(val));
+            sugerencias.forEach(prod => {
+                let div = document.createElement('div');
+                div.textContent = prod.nombre + " (S/ " + prod.precio.toFixed(2) + ")";
+                div.onclick = function() {
+                    productoInput.value = prod.nombre;
+                    productoSeleccionado = prod;
+                    autocompleteList.innerHTML = '';
+                };
+                autocompleteList.appendChild(div);
+            });
+        };
+        productoInput.onblur = function() { setTimeout(() => autocompleteList.innerHTML = '', 180); };
+
+        // -------- AGREGAR PRODUCTO AL PEDIDO ---------
+        document.getElementById('agregarBtn').onclick = function() {
+            const nombre = productoInput.value.trim();
+            const cant = parseInt(document.getElementById('cantidadInput').value, 10) || 1;
+            let prod = catalogoArray.find(p => p.nombre.toLowerCase() === nombre.toLowerCase());
+            if (!prod) {
+                showMessage('Selecciona un producto válido', 'error');
+                return;
+            }
+            let existente = pedidoDetalle.find(p => p.id === prod.id);
+            if (existente) {
+                existente.cantidad += cant;
+            } else {
+                pedidoDetalle.push({ ...prod, cantidad: cant });
+            }
+            productoInput.value = '';
+            productoSeleccionado = null;
+            renderTablaPedido();
+        };
+
+        // --------- TABLA DE PRODUCTOS EN EL PEDIDO ---------
+        function renderTablaPedido() {
+            const tbody = document.getElementById('tablaPedido').querySelector('tbody');
+            tbody.innerHTML = '';
+            let total = 0;
+            pedidoDetalle.forEach((prod, idx) => {
+                let sub = prod.precio * prod.cantidad;
+                total += sub;
+                let tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${prod.nombre}</td>
+                    <td>${prod.cantidad}</td>
+                    <td>S/ ${prod.precio.toFixed(2)}</td>
+                    <td>S/ ${sub.toFixed(2)}</td>
+                    <td>
+                        <button type="button" style="color:#e74c3c;font-size:1.1em;" onclick="this.closest('tr').remove();pedidoDetalle.splice(${idx},1);renderTablaPedido();">🗑️</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            // Taper para llevar
+            if (document.getElementById('chkTaper').checked) {
+                let taperCant = pedidoDetalle.reduce((sum, item) => sum + item.cantidad, 0);
+                total += taperCant;
+            }
+            document.getElementById('pedidoTotal').innerText = "S/ " + total.toFixed(2);
+        }
+        document.getElementById('chkTaper').onchange = renderTablaPedido;
+
+        // --------- SUBMIT PEDIDO ---------
+        document.getElementById('nuevoPedidoForm').onsubmit = async function(e) {
+            e.preventDefault();
+            let detalle = [...pedidoDetalle];
+            let total = detalle.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
+            let esParaLlevar = document.getElementById('chkTaper').checked;
+            if (esParaLlevar) {
+                let taperCant = detalle.reduce((s, item) => s + item.cantidad, 0);
+                if (taperCant > 0) {
+                    total += taperCant;
+                    detalle.push({ id: "taper", nombre: "Taper (envase adicional)", precio: 1, cantidad: taperCant });
+                }
+            }
+            if (detalle.length === 0) {
+                showMessage("Debe agregar al menos un producto.", "error");
+                return;
+            }
+            await crearPedido(num, total, detalle);
+            closeMesaModal();
+        };
+        return; // ---- IMPORTANTE: salir aquí si es nuevo pedido ----
+    }
+
+    // ----------- SI LA MESA ESTÁ OCUPADA O PARCIALMENTE PAGADA ----------- 
+    let pagadoActual = pagado;
+    let abonosStr = '';
+    if (idPedido) {
+        const pedido = await db.pedidos.get(idPedido);
+        if (pedido && pedido.abonos && Array.isArray(pedido.abonos) && pedido.abonos.length) {
+            pagadoActual = pedido.abonos.reduce((sum, a) => sum + Number(a.monto), 0);
+            abonosStr = pedido.abonos.map(a =>
+                `<div style="font-size:0.97em; color:#444; margin-bottom:2px;">
+                    ${a.tipo_pago.charAt(0).toUpperCase()+a.tipo_pago.slice(1)}: S/ ${Number(a.monto).toFixed(2)}
+                </div>`
+            ).join('');
+        }
+    }
+    const saldoPendiente = monto - pagadoActual;
+    showMesaModal(`
+        <h3>Mesa ${num} (${estado === MESA_ESTADOS.OCUPADA ? 'Ocupada' : 'Pago parcial'})</h3>
+        <div><b>Monto Total:</b> S/ ${monto.toFixed(2)}</div>
+        <div><b>Pagado:</b> S/ ${pagadoActual.toFixed(2)}</div>
+        <div><b>Detalle de abonos:</b><br>${abonosStr || '<i>No hay abonos registrados</i>'}</div>
+        <div id="saldoRestante" style="margin: 8px 0 10px 0; font-weight: bold; color: #2c3e50;">
+            Saldo pendiente: S/ ${saldoPendiente.toFixed(2)}
+        </div>
+        <form id="abonoForm" autocomplete="off" style="margin-top:8px;">
+            <label>Monto a abonar:<br>
+                <input type="number" min="0.01" max="${saldoPendiente}" step="0.01" name="abono" required
+                    style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+            </label><br>
+            <label>Medio de Pago:</label>
+            <div id="pagoBotones" style="display: flex; gap: 10px; margin: 10px 0;">
+                <button type="button" class="btn-medio btn-efectivo" data-pago="efectivo">Efectivo</button>
+                <button type="button" class="btn-medio btn-yape" data-pago="yape">Yape</button>
+                <button type="button" class="btn-medio btn-tarjeta" data-pago="tarjeta">Tarjeta</button>
+            </div>
+            <input type="hidden" name="tipo_pago" id="inputTipoPagoMesa" required>
+            <button type="submit" class="btn" style="margin-top:12px;">Abonar</button>
+        </form>
+        <button class="btn-secondary" style="margin-top:10px;" onclick="editarPedidoModal(${idPedido},${num},${monto})">Editar monto</button>
+        <button class="btn-secondary" style="margin-top:10px;" onclick="anularPedido(${idPedido},${num})">Anular pedido</button>
+        <button class="btn-secondary" style="margin-top:10px;" onclick="closeMesaModal()">Cerrar</button>
+    `);
+
+    // Lógica selección de medio de pago
+    const pagoBotones = document.querySelectorAll("#pagoBotones .btn-medio");
+    const inputTipoPago = document.getElementById("inputTipoPagoMesa");
+    pagoBotones.forEach(btn => {
+        btn.onclick = function() {
+            pagoBotones.forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            inputTipoPago.value = btn.getAttribute('data-pago');
+        };
+    });
+    pagoBotones[0].click();
+
+    // Actualiza saldo restante al escribir monto
+    document.querySelector('#abonoForm input[name="abono"]').addEventListener('input', function() {
+        let val = parseFloat(this.value) || 0;
+        let saldo = saldoPendiente - val;
+        if (saldo < 0) saldo = 0;
+        document.getElementById('saldoRestante').innerHTML = `Saldo pendiente: S/ ${saldo.toFixed(2)}`;
+    });
+
+    document.getElementById('abonoForm').onsubmit = async function(e) {
+        e.preventDefault();
+        const abono = parseFloat(this.abono.value);
+        const tipo_pago = inputTipoPago.value;
+        if (!tipo_pago) {
+            alert("Debe seleccionar un medio de pago");
+            return;
+        }
+        await abonarPedido(idPedido, abono, tipo_pago, monto, pagadoActual, num);
+
+        // Verifica si ya está pagado todo
+        const pedidoActualizado = await db.pedidos.get(idPedido);
+        let pagadoTotal = 0;
+        if (pedidoActualizado && pedidoActualizado.abonos) {
+            pagadoTotal = pedidoActualizado.abonos.reduce((sum, a) => sum + Number(a.monto), 0);
+        } else {
+            pagadoTotal = pedidoActualizado ? pedidoActualizado.pagado : 0;
+        }
+        if (pagadoTotal >= monto) {
+            closeMesaModal();
+        } else {
+            await clickMesa(num, idPedido, estado, monto, pagadoTotal);
+        }
+    };
+}
+
+
+
+
+
+
+async function crearPedido(num, monto, detalle=[]) {
+    if (isNaN(monto) || monto <= 0) return;
+    const fecha = new Date().toISOString().split('T')[0];
+    const pedidosActivos = await db.pedidos.where({ fecha, mesa: num }).filter(p => p.estado !== "libre").toArray();
+    if (pedidosActivos.length > 0) {
+        showMessage('Ya existe un pedido activo para esta mesa hoy.', 'error');
+        return;
+    }
+    const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+    const timestamp = new Date().toISOString();
+    const tipo_pedido = "mesa";
+    await db.pedidos.add({
+        fecha, hora, mesa: num, monto, tipo_pedido, tipo_pago: '', pagado: 0, estado: "ocupada", timestamp,
+        detalle // <--- guarda el detalle completo
+    });
+    await renderMesas();
+    await updateStats();
+    await updateResumenPagadosTable();
+    showMessage('Pedido creado para mesa ' + num);
+}
+
+
+async function abonarPedido(idPedido, abono, tipo_pago, monto, pagado, num) {
+    const pedido = await db.pedidos.get(idPedido);
+    if (!pedido) { showMessage('Pedido no encontrado', 'error'); return; }
+    // Suma de abonos ya realizados
+    let abonos = pedido.abonos || [];
+    let pagadoActual = abonos.reduce((sum, a) => sum + Number(a.monto), 0);
+
+    const pendiente = pedido.monto - pagadoActual;
+    if (isNaN(abono) || abono <= 0 || abono > pendiente) {
+        showMessage(`Abono inválido. El máximo permitido es S/ ${pendiente.toFixed(2)}`, 'error');
+        return;
+    }
+    // Agrega nuevo abono
+    abonos.push({
+        monto: abono,
+        tipo_pago,
+        fecha: new Date().toISOString()
+    });
+    const pagadoNuevo = pagadoActual + abono;
+    await db.pedidos.update(idPedido, { 
+        pagado: pagadoNuevo, 
+        abonos: abonos, 
+        estado: pagadoNuevo >= pedido.monto ? "libre" : pedido.estado 
+    });
+    await renderMesas();
+    await updateStats();
+    await updateResumenPagadosTable();
+    showMessage(`Pago registrado para mesa ${num}`);
+}
+
+window.editarPedidoModal = async function(idPedido, num, monto) {
+    showMesaModal(`
+        <h3>Editar monto Mesa ${num}</h3>
+        <form id="editarPedidoForm" autocomplete="off">
+            <label>Nuevo monto:<br>
+                <input type="number" min="0.01" step="0.01" name="monto" value="${monto}" required style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+            </label><br>
+            <button type="submit" class="btn" style="margin-top:12px;">Actualizar</button>
+            <button type="button" onclick="closeMesaModal()" class="btn-secondary" style="margin-top:12px;">Cancelar</button>
+        </form>
+    `);
+    document.getElementById('editarPedidoForm').onsubmit = async function(e) {
+        e.preventDefault();
+        const nuevoMonto = parseFloat(this.monto.value);
+        await db.pedidos.update(idPedido, { monto: nuevoMonto });
+        await renderMesas();
+        await updateStats();
+        await updateResumenPagadosTable();
+        showMessage('Monto actualizado.');
+        closeMesaModal();
+    };
+};
+window.anularPedido = async function(idPedido, num) {
+    if (confirm(`¿Anular pedido de Mesa ${num}? Esta acción no se puede deshacer.`)) {
+        await db.pedidos.delete(idPedido);
+        await renderMesas();
+        await updateStats();
+        await updateResumenPagadosTable();
+        showMessage('Pedido anulado.');
+        closeMesaModal();
+    }
+};
+
+/* --------- Resumen y reportes --------- */
+async function updateResumenPagadosTable() {
+    const cont = document.getElementById('resumenPagadosTable');
+    const today = new Date().toISOString().split('T')[0];
+    const rows = await db.pedidos.where("fecha").equals(today).filter(p => (p.pagado || 0) > 0).toArray();
+    if (!rows.length) {
+        cont.innerHTML = '<div style="color:#666;padding:15px;">No hay pedidos pagados aún.</div>';
+        return;
+    }
+    cont.innerHTML = `
+        <table style="width:100%;margin-bottom:15px;">
+            <thead>
+                <tr>
+                    <th>Mesa</th>
+                    <th>Monto Total</th>
+                    <th>Pagado</th>
+                    <th>Falta</th>
+                    <th>Detalle de Pagos</th>
+                    <th>Imprimir</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rows.map(r => {
+                    let efectivo = 0, yape = 0, tarjeta = 0;
+                    if (r.abonos && Array.isArray(r.abonos)) {
+                        r.abonos.forEach(ab => {
+                            if (ab.tipo_pago === "efectivo") efectivo += Number(ab.monto) || 0;
+                            if (ab.tipo_pago === "yape") yape += Number(ab.monto) || 0;
+                            if (ab.tipo_pago === "tarjeta") tarjeta += Number(ab.monto) || 0;
+                        });
+                    } else if (r.tipo_pago) {
+                        if (r.tipo_pago === "efectivo") efectivo = Number(r.pagado) || 0;
+                        if (r.tipo_pago === "yape") yape = Number(r.pagado) || 0;
+                        if (r.tipo_pago === "tarjeta") tarjeta = Number(r.pagado) || 0;
+                    }
+                    let detalle = [
+                        efectivo ? `Efectivo: S/ ${efectivo.toFixed(2)}` : '',
+                        yape ? `Yape: S/ ${yape.toFixed(2)}` : '',
+                        tarjeta ? `Tarjeta: S/ ${tarjeta.toFixed(2)}` : ''
+                    ].filter(Boolean).join("<br>");
+                    return `
+                    <tr>
+                        <td style="text-align:center;">
+                            ${r.mesa === 0
+                                ? (r.tipo_pedido === "para llevar" ? "Para Llevar" :
+                                    r.tipo_pedido === "delivery" ? "Delivery" : "Especial")
+                                : "M" + r.mesa.toString().padStart(2, '0')}
+                        </td>
+                        <td>S/ ${Number(r.monto).toFixed(2)}</td>
+                        <td>S/ ${Number(r.pagado).toFixed(2)}</td>
+                        <td>S/ ${(Number(r.monto) - Number(r.pagado)).toFixed(2)}</td>
+                        <td>${detalle || '-'}</td>
+                        <td>
+                            <button class="btn-secondary" style="padding:7px 14px;font-size:0.97em"
+                                onclick="imprimirDetalleAbonos(${r.id})">
+                                🖨️ Imprimir
+                            </button>
+                        </td>
+                    </tr>
+                `}).join('')}
+            </tbody>
+        </table>
+    `;
+}
+window.imprimirDetalleAbonos = async function(idPedido) {
+    const pedido = await db.pedidos.get(idPedido);
+    if (!pedido) return alert('Pedido no encontrado');
+    let nombre = pedido.nombre || '-';
+    let mesa = pedido.mesa === 0
+        ? (pedido.tipo_pedido === "para llevar" ? "Para Llevar"
+            : pedido.tipo_pedido === "delivery" ? "Delivery" : "Especial")
+        : "M" + pedido.mesa.toString().padStart(2, '0');
+
+    let html = `
+    <div style="font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;min-width:350px;">
+        <h2 style="text-align:center;margin-bottom:12px;">Detalle de Pedido</h2>
+        <b>Mesa/Pedido:</b> ${mesa} <br>
+        <b>Nombre:</b> ${nombre} <br>
+        <b>Monto Total:</b> S/ ${Number(pedido.monto).toFixed(2)}<br>
+        <b>Pagado:</b> S/ ${Number(pedido.pagado).toFixed(2)}<br>
+        <b>Falta:</b> S/ ${(Number(pedido.monto) - Number(pedido.pagado)).toFixed(2)}<br>
+        <hr style="margin:10px 0;">
+        <b>Abonos realizados:</b>
+        <table border="1" cellpadding="7" cellspacing="0" style="width:100%;margin-top:8px;font-size:1em;">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Monto</th>
+                    <th>Medio</th>
+                    <th>Fecha/Hora</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${(pedido.abonos || []).map((a, i) => `
+                    <tr>
+                        <td style="text-align:center">${i + 1}</td>
+                        <td>S/ ${Number(a.monto).toFixed(2)}</td>
+                        <td>${a.tipo_pago.charAt(0).toUpperCase() + a.tipo_pago.slice(1)}</td>
+                        <td>${new Date(a.fecha).toLocaleString('es-PE')}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    </div>
+    `;
+    // Abrir en nueva ventana lista para imprimir
+    let w = window.open('', '_blank', 'width=500,height=700');
+    w.document.write(`
+        <html><head><title>Detalle de Abonos</title></head><body>${html}
+        <br><button onclick="window.print();">Imprimir</button>
+        </body></html>
+    `);
+    w.document.close();
+};
+
+async function updateStats() {
+    const today = new Date().toISOString().split('T')[0];
+    const paymentTotals = { efectivo: 0, yape: 0, tarjeta: 0 };
+    const rows = await db.pedidos.where("fecha").equals(today).toArray();
+    for (const row of rows) {
+        if (row.abonos && Array.isArray(row.abonos)) {
+            row.abonos.forEach(ab => {
+                if (ab.tipo_pago && paymentTotals[ab.tipo_pago] !== undefined) {
+                    paymentTotals[ab.tipo_pago] += Number(ab.monto) || 0;
+                }
+            });
+        } else if (row.tipo_pago && paymentTotals[row.tipo_pago] !== undefined) {
+            // Compatibilidad con pedidos antiguos (sin abonos)
+            paymentTotals[row.tipo_pago] += Number(row.pagado) || 0;
+        }
+    }
+    const totalDia = paymentTotals.efectivo + paymentTotals.yape + paymentTotals.tarjeta;
+    document.getElementById('efectivoTotal').textContent = `S/ ${paymentTotals.efectivo.toFixed(2)}`;
+    document.getElementById('yapeTotal').textContent = `S/ ${paymentTotals.yape.toFixed(2)}`;
+    document.getElementById('tarjetaTotal').textContent = `S/ ${paymentTotals.tarjeta.toFixed(2)}`;
+    document.getElementById('totalDia').textContent = `S/ ${totalDia.toFixed(2)}`;
+    // Leer caja de apertura del día
+    let cajaApertura = 0;
+    const conf = await db.configuracion.where({ fecha: today }).first();
+    if (conf) cajaApertura = Number(conf.caja_apertura) || 0;
+    const ganancia = totalDia - cajaApertura;
+    document.getElementById('ganancia').textContent = `S/ ${ganancia.toFixed(2)}`;
+}
+
+async function loadCajaApertura() {
+    const today = new Date().toISOString().split('T')[0];
+    const conf = await db.configuracion.where({ fecha: today }).first();
+    if (conf) document.getElementById('cajaApertura').value = conf.caja_apertura;
+}
+async function setCajaApertura() {
+    const amount = parseFloat(document.getElementById('cajaApertura').value);
+    if (isNaN(amount) || amount < 0) { showMessage('Por favor, ingrese un monto válido', 'error'); return; }
+    const today = new Date().toISOString().split('T')[0];
+    await db.configuracion.where({ fecha: today }).delete();
+    await db.configuracion.add({ fecha: today, caja_apertura: amount });
+    await updateStats();
+    showMessage(`Caja de apertura establecida: S/ ${amount.toFixed(2)}`, 'success');
+}
+function setupEventListeners() {
+    document.getElementById('btnCajaApertura').addEventListener('click', setCajaApertura);
+}
+document.getElementById('btnGenerarReporte').onclick = async function() {
+    const inicio = document.getElementById('fechaInicio').value;
+    const fin = document.getElementById('fechaFin').value;
+    if (!inicio || !fin) {
+        showMessage('Debe seleccionar ambas fechas', 'error');
+        return;
+    }
+    let html = `<table><thead>
+        <tr><th>Fecha</th><th>Hora</th><th>Mesa</th><th>Tipo Pedido</th><th>Tipo Pago</th><th>Monto</th></tr>
+    </thead><tbody>`;
+    const rows = await db.pedidos
+        .where("fecha").between(inicio, fin, true, true)
+        .filter(p => p.pagado >= p.monto).toArray();
+    for (const p of rows) {
+        html += `<tr>
+            <td>${p.fecha}</td>
+            <td>${p.hora}</td>
+            <td>
+                ${p.mesa === 0
+                    ? (p.tipo_pedido === "para llevar" ? "Para Llevar" :
+                        p.tipo_pedido === "delivery" ? "Delivery" : "Especial")
+                    : "M" + p.mesa.toString().padStart(2, '0')}
+            </td>
+            <td>${p.tipo_pedido || '-'}</td>
+            <td>${p.tipo_pago}</td>
+            <td>S/ ${Number(p.monto).toFixed(2)}</td>
+        </tr>`;
+    }
+    html += '</tbody></table>';
+    document.getElementById('tablaReporte').innerHTML = html;
+};
+// Deja SOLO este window.onload para evitar duplicados
+window.onload = async () => {
+    const today = (new Date()).toISOString().slice(0, 10);
+    document.getElementById('fechaInicio').value = today;
+    document.getElementById('fechaFin').value = today;
+    await cerrarCajaAnteriorSiCorresponde();
+    await initApp();
+};
+
+/* --------- Exportar/Importar/Limpiar BD --------- */
+document.getElementById('btnExportarBD').onclick = async function() {
+    const data = {
+        pedidos: await db.pedidos.toArray(),
+        configuracion: await db.configuracion.toArray()
+    };
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'restaurantDB.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+};
+document.getElementById('btnImportarBD').onclick = function() {
+    document.getElementById('fileImportarBD').click();
+};
+document.getElementById('fileImportarBD').onchange = async function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async function(event) {
+        try {
+            const data = JSON.parse(event.target.result);
+            await db.pedidos.clear();
+            await db.configuracion.clear();
+            await db.pedidos.bulkAdd(data.pedidos || []);
+            await db.configuracion.bulkAdd(data.configuracion || []);
+            await renderMesas();
+            await updateStats();
+            await updateResumenPagadosTable();
+            showMessage('Base de datos importada exitosamente');
+        } catch (err) {
+            showMessage('Error importando la base de datos', 'error');
+        }
+    };
+    reader.readAsText(file);
+};
+document.getElementById('btnLimpiarBD').onclick = async function() {
+    if (!confirm('¿Seguro que deseas limpiar toda la base de datos? Esta acción NO se puede deshacer.')) return;
+    await db.pedidos.clear();
+    await db.configuracion.clear();
+    await renderMesas();
+    await updateStats();
+    await updateResumenPagadosTable();
+    showMessage('Base de datos limpiada');
+};
