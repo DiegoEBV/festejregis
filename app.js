@@ -1,4 +1,86 @@
+// Claves simples para ejemplo. Cambia a gusto.
+const USUARIOS = {
+  caja:   { clave: "1234" },
+  moso:   { clave: "moso" } // clave común para todos los mosos
+};
+let usuarioActual = null;        // "caja" o "moso"
+let nombreMosoActual = null;     // nombre/alias del moso actual
+
+// Mostrar/ocultar campo nombre moso según selección
+const usuarioSelect = document.getElementById('usuario');
+const nombreMosoBox = document.getElementById('nombreMosoBox');
+const nombreMosoInput = document.getElementById('nombreMoso');
+usuarioSelect.addEventListener('change', function() {
+    if (usuarioSelect.value === 'moso') {
+        nombreMosoBox.style.display = 'block';
+        nombreMosoInput.required = true;
+    } else {
+        nombreMosoBox.style.display = 'none';
+        nombreMosoInput.required = false;
+        nombreMosoInput.value = '';
+    }
+});
+
+// LOGIN
+function mostrarLogin() {
+  document.getElementById('loginModal').style.display = 'flex';
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('btnCambiarUsuario').style.display = 'none';
+}
+function ocultarLogin() {
+  document.getElementById('loginModal').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('btnCambiarUsuario').style.display = 'block';
+  configurarUIporUsuario();
+}
+
+document.getElementById('loginForm').onsubmit = function(e) {
+  e.preventDefault();
+  const usuario = document.getElementById('usuario').value;
+  const clave = document.getElementById('clave').value;
+  // Si es moso, debe llenar nombre de moso
+  if (usuario === 'moso') {
+      let nombre = nombreMosoInput.value.trim();
+      if (!nombre) {
+        alert('Ingrese el nombre del moso.');
+        nombreMosoInput.focus();
+        return;
+      }
+      nombreMosoActual = nombre;
+  } else {
+      nombreMosoActual = null;
+  }
+  if (USUARIOS[usuario] && clave === USUARIOS[usuario].clave) {
+    usuarioActual = usuario;
+    ocultarLogin();
+    initApp();
+    document.getElementById('clave').value = "";
+  } else {
+    alert("Usuario o clave incorrecta.");
+    document.getElementById('clave').value = "";
+  }
+};
+
+// Permite cambiar usuario con botón
+document.getElementById('btnCambiarUsuario').onclick = function() {
+  usuarioActual = null;
+  nombreMosoActual = null;
+  mostrarLogin();
+};
+
+// Controla UI por rol
+function configurarUIporUsuario() {
+  // Solo caja ve .solo-caja (reportes, caja, resumen, pedidos especiales)
+  const esCaja = usuarioActual === "caja";
+  document.querySelectorAll('.solo-caja').forEach(el => el.style.display = esCaja ? '' : 'none');
+  // Solo caja ve pedidos especiales (para llevar, delivery)
+  document.querySelectorAll('.pedido-especial-box').forEach(el => el.style.display = esCaja ? '' : 'none');
+  // Si tienes elementos solo para mosos (opcional)
+  document.querySelectorAll('.solo-moso').forEach(el => el.style.display = !esCaja ? '' : 'none');
+}
+
 /* --------- Dexie DB setup --------- */
+
 const catalogo = {
   menu:         { nombre: "Menú", precio: 13 },
   sopa:         { nombre: "Sopa", precio: 6 },
@@ -133,8 +215,13 @@ function showMesaModal(html) {
     document.getElementById('mesaModalContent').innerHTML = html;
     document.getElementById('mesaModal').style.display = 'flex';
 }
-function closeMesaModal() { document.getElementById('mesaModal').style.display = 'none'; }
-document.getElementById('mesaModal').onclick = function(e) { if (e.target === this) closeMesaModal(); };
+function closeMesaModal() {
+    document.getElementById('mesaModal').style.display = 'none';
+    // Oculta autocompletados por si quedan abiertos
+    if(document.getElementById('autocompleteList')) document.getElementById('autocompleteList').style.display = 'none';
+    if(document.getElementById('autocompleteListAgregar')) document.getElementById('autocompleteListAgregar').style.display = 'none';
+}
+
 
 /* --------- Pedidos especiales --------- */
 document.getElementById('btnParaLlevar').onclick = () => showPedidoEspecialModal('para llevar');
@@ -273,9 +360,12 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
                 <div class="pedido-row">
                     <div class="pedido-col producto">
                         <label for="productoInput">Producto:</label>
-                        <input type="text" id="productoInput" placeholder="Escribe para buscar..." autocomplete="off" />
-                        <div id="autocompleteList" class="autocomplete-items"></div>
+                        <div class="autocomplete-container" style="position:relative;">
+                            <input type="text" id="productoInput" placeholder="Escribe para buscar..." autocomplete="off" />
+                            <div id="autocompleteList" class="autocomplete-items"></div>
+                        </div>
                     </div>
+
                     <div class="pedido-col cantidad">
                         <label for="cantidadInput">Cantidad:</label>
                         <input type="number" id="cantidadInput" min="1" value="1" />
@@ -298,10 +388,6 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
                         <tbody></tbody>
                     </table>
                 </div>
-                <div class="pedido-llevar-row">
-                    <input type="checkbox" id="chkTaper" value="1" />
-                    <label for="chkTaper">¿Pedido para llevar / delivery? <span class="taper-info">(S/ 1.00 x envase)</span></label>
-                </div>
                 <div class="pedido-total-row">
                     <span>Total:</span>
                     <span id="pedidoTotal" class="pedido-total-valor">S/ 0.00</span>
@@ -310,6 +396,7 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
                 <button type="button" onclick="closeMesaModal()" class="btn-cancelar">Cancelar</button>
             </form>
         `;
+
         showMesaModal(htmlForm);
 
         // ------- AUTOCOMPLETADO ---------
@@ -317,23 +404,31 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
         const autocompleteList = document.getElementById('autocompleteList');
         let productoSeleccionado = null;
 
-        productoInput.oninput = function() {
-            let val = this.value.trim().toLowerCase();
-            autocompleteList.innerHTML = '';
-            if (!val) return;
-            const sugerencias = catalogoArray.filter(p => p.nombre.toLowerCase().includes(val));
-            sugerencias.forEach(prod => {
-                let div = document.createElement('div');
-                div.textContent = prod.nombre + " (S/ " + prod.precio.toFixed(2) + ")";
-                div.onclick = function() {
-                    productoInput.value = prod.nombre;
-                    productoSeleccionado = prod;
-                    autocompleteList.innerHTML = '';
-                };
-                autocompleteList.appendChild(div);
-            });
-        };
-        productoInput.onblur = function() { setTimeout(() => autocompleteList.innerHTML = '', 180); };
+        productoInput.oninput = function () {
+        let val = this.value.trim().toLowerCase();
+        autocompleteList.innerHTML = '';
+        autocompleteList.style.display = 'none';
+        if (!val) return;
+        const sugerencias = catalogoArray.filter(p => p.nombre.toLowerCase().includes(val));
+        sugerencias.forEach(prod => {
+            let div = document.createElement('div');
+            div.textContent = prod.nombre + " (S/ " + prod.precio.toFixed(2) + ")";
+            div.onclick = function () {
+                productoInput.value = prod.nombre;
+                productoSeleccionado = prod;
+                autocompleteList.innerHTML = '';
+                autocompleteList.style.display = 'none';
+            };
+            autocompleteList.appendChild(div);
+        });
+        if (sugerencias.length) {
+            autocompleteList.style.display = 'block';
+        }
+    };
+    // Oculta cuando pierdes foco
+    productoInput.onblur = function () { setTimeout(() => autocompleteList.style.display = 'none', 150); };
+
+
 
         // -------- AGREGAR PRODUCTO AL PEDIDO ---------
         document.getElementById('agregarBtn').onclick = function() {
@@ -375,28 +470,16 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
                 `;
                 tbody.appendChild(tr);
             });
-            // Taper para llevar
-            if (document.getElementById('chkTaper').checked) {
-                let taperCant = pedidoDetalle.reduce((sum, item) => sum + item.cantidad, 0);
-                total += taperCant;
-            }
+
             document.getElementById('pedidoTotal').innerText = "S/ " + total.toFixed(2);
         }
-        document.getElementById('chkTaper').onchange = renderTablaPedido;
+
 
         // --------- SUBMIT PEDIDO ---------
         document.getElementById('nuevoPedidoForm').onsubmit = async function(e) {
             e.preventDefault();
             let detalle = [...pedidoDetalle];
             let total = detalle.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
-            let esParaLlevar = document.getElementById('chkTaper').checked;
-            if (esParaLlevar) {
-                let taperCant = detalle.reduce((s, item) => s + item.cantidad, 0);
-                if (taperCant > 0) {
-                    total += taperCant;
-                    detalle.push({ id: "taper", nombre: "Taper (envase adicional)", precio: 1, cantidad: taperCant });
-                }
-            }
             if (detalle.length === 0) {
                 showMessage("Debe agregar al menos un producto.", "error");
                 return;
@@ -404,100 +487,244 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
             await crearPedido(num, total, detalle);
             closeMesaModal();
         };
+
         return; // ---- IMPORTANTE: salir aquí si es nuevo pedido ----
     }
 
-    // ----------- SI LA MESA ESTÁ OCUPADA O PARCIALMENTE PAGADA ----------- 
-    let pagadoActual = pagado;
-    let abonosStr = '';
-    if (idPedido) {
-        const pedido = await db.pedidos.get(idPedido);
-        if (pedido && pedido.abonos && Array.isArray(pedido.abonos) && pedido.abonos.length) {
-            pagadoActual = pedido.abonos.reduce((sum, a) => sum + Number(a.monto), 0);
-            abonosStr = pedido.abonos.map(a =>
-                `<div style="font-size:0.97em; color:#444; margin-bottom:2px;">
-                    ${a.tipo_pago.charAt(0).toUpperCase()+a.tipo_pago.slice(1)}: S/ ${Number(a.monto).toFixed(2)}
-                </div>`
-            ).join('');
-        }
+    // --- Si la mesa está ocupada o parcialmente pagada ---
+  let pagadoActual = pagado;
+  let abonosStr = '';
+  if (idPedido) {
+    const pedido = await db.pedidos.get(idPedido);
+    if (pedido && pedido.abonos && Array.isArray(pedido.abonos) && pedido.abonos.length) {
+      pagadoActual = pedido.abonos.reduce((sum, a) => sum + Number(a.monto), 0);
+      abonosStr = pedido.abonos.map(a =>
+        `<div style="font-size:0.97em; color:#444; margin-bottom:2px;">
+          ${a.tipo_pago.charAt(0).toUpperCase()+a.tipo_pago.slice(1)}: S/ ${Number(a.monto).toFixed(2)}
+        </div>`
+      ).join('');
     }
-    const saldoPendiente = monto - pagadoActual;
-    showMesaModal(`
-        <h3>Mesa ${num} (${estado === MESA_ESTADOS.OCUPADA ? 'Ocupada' : 'Pago parcial'})</h3>
-        <div><b>Monto Total:</b> S/ ${monto.toFixed(2)}</div>
-        <div><b>Pagado:</b> S/ ${pagadoActual.toFixed(2)}</div>
-        <div><b>Detalle de abonos:</b><br>${abonosStr || '<i>No hay abonos registrados</i>'}</div>
-        <div id="saldoRestante" style="margin: 8px 0 10px 0; font-weight: bold; color: #2c3e50;">
-            Saldo pendiente: S/ ${saldoPendiente.toFixed(2)}
+  }
+  const saldoPendiente = monto - pagadoActual;
+  let botonesExtras = '';
+  // SOLO CAJA puede abonar/anular
+  if (usuarioActual === 'caja') {
+    botonesExtras = `
+      <form id="abonoForm" autocomplete="off" style="margin-top:8px;">
+        <label>Monto a abonar:<br>
+          <input type="number" min="0.01" max="${saldoPendiente}" step="0.01" name="abono" required
+              style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+        </label><br>
+        <label>Medio de Pago:</label>
+        <div id="pagoBotones" style="display: flex; gap: 10px; margin: 10px 0;">
+            <button type="button" class="btn-medio btn-efectivo" data-pago="efectivo">Efectivo</button>
+            <button type="button" class="btn-medio btn-yape" data-pago="yape">Yape</button>
+            <button type="button" class="btn-medio btn-tarjeta" data-pago="tarjeta">Tarjeta</button>
         </div>
-        <form id="abonoForm" autocomplete="off" style="margin-top:8px;">
-            <label>Monto a abonar:<br>
-                <input type="number" min="0.01" max="${saldoPendiente}" step="0.01" name="abono" required
-                    style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
-            </label><br>
-            <label>Medio de Pago:</label>
-            <div id="pagoBotones" style="display: flex; gap: 10px; margin: 10px 0;">
-                <button type="button" class="btn-medio btn-efectivo" data-pago="efectivo">Efectivo</button>
-                <button type="button" class="btn-medio btn-yape" data-pago="yape">Yape</button>
-                <button type="button" class="btn-medio btn-tarjeta" data-pago="tarjeta">Tarjeta</button>
-            </div>
-            <input type="hidden" name="tipo_pago" id="inputTipoPagoMesa" required>
-            <button type="submit" class="btn" style="margin-top:12px;">Abonar</button>
-        </form>
-        <button class="btn-secondary" style="margin-top:10px;" onclick="editarPedidoModal(${idPedido},${num},${monto})">Editar monto</button>
-        <button class="btn-secondary" style="margin-top:10px;" onclick="anularPedido(${idPedido},${num})">Anular pedido</button>
-        <button class="btn-secondary" style="margin-top:10px;" onclick="closeMesaModal()">Cerrar</button>
-    `);
+        <input type="hidden" name="tipo_pago" id="inputTipoPagoMesa" required>
+        <button type="submit" class="btn" style="margin-top:12px;">Abonar</button>
+      </form>
+      <button class="btn-secondary" style="margin-top:10px;" onclick="anularPedido(${idPedido},${num})">Anular pedido</button>
+    `;
+  }
 
-    // Lógica selección de medio de pago
+  showMesaModal(`
+    <h3>Mesa ${num} (${estado === MESA_ESTADOS.OCUPADA ? 'Ocupada' : 'Pago parcial'})</h3>
+    <div><b>Monto Total:</b> S/ ${monto.toFixed(2)}</div>
+    <div><b>Pagado:</b> S/ ${pagadoActual.toFixed(2)}</div>
+    <div><b>Detalle de abonos:</b><br>${abonosStr || '<i>No hay abonos registrados</i>'}</div>
+    <div id="saldoRestante" style="margin: 8px 0 10px 0; font-weight: bold; color: #2c3e50;">
+        Saldo pendiente: S/ ${saldoPendiente.toFixed(2)}
+    </div>
+    ${botonesExtras}
+    <button class="btn-secondary" style="margin-top:10px;" onclick="agregarPlatosModal(${idPedido},${num})">Agregar platos</button>
+    <button class="btn-secondary" style="margin-top:10px;" onclick="closeMesaModal()">Cerrar</button>
+  `);
+
+  // Solo CAJA configura el abono/pago
+  if (usuarioActual === 'caja' && document.getElementById('abonoForm')) {
     const pagoBotones = document.querySelectorAll("#pagoBotones .btn-medio");
     const inputTipoPago = document.getElementById("inputTipoPagoMesa");
     pagoBotones.forEach(btn => {
-        btn.onclick = function() {
-            pagoBotones.forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-            inputTipoPago.value = btn.getAttribute('data-pago');
-        };
+      btn.onclick = function() {
+        pagoBotones.forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        inputTipoPago.value = btn.getAttribute('data-pago');
+      };
     });
     pagoBotones[0].click();
 
-    // Actualiza saldo restante al escribir monto
     document.querySelector('#abonoForm input[name="abono"]').addEventListener('input', function() {
-        let val = parseFloat(this.value) || 0;
-        let saldo = saldoPendiente - val;
-        if (saldo < 0) saldo = 0;
-        document.getElementById('saldoRestante').innerHTML = `Saldo pendiente: S/ ${saldo.toFixed(2)}`;
+      let val = parseFloat(this.value) || 0;
+      let saldo = saldoPendiente - val;
+      if (saldo < 0) saldo = 0;
+      document.getElementById('saldoRestante').innerHTML = `Saldo pendiente: S/ ${saldo.toFixed(2)}`;
     });
 
     document.getElementById('abonoForm').onsubmit = async function(e) {
-        e.preventDefault();
-        const abono = parseFloat(this.abono.value);
-        const tipo_pago = inputTipoPago.value;
-        if (!tipo_pago) {
-            alert("Debe seleccionar un medio de pago");
-            return;
-        }
-        await abonarPedido(idPedido, abono, tipo_pago, monto, pagadoActual, num);
+      e.preventDefault();
+      const abono = parseFloat(this.abono.value);
+      const tipo_pago = inputTipoPago.value;
+      if (!tipo_pago) {
+        alert("Debe seleccionar un medio de pago");
+        return;
+      }
+      await abonarPedido(idPedido, abono, tipo_pago, monto, pagadoActual, num);
 
-        // Verifica si ya está pagado todo
-        const pedidoActualizado = await db.pedidos.get(idPedido);
-        let pagadoTotal = 0;
-        if (pedidoActualizado && pedidoActualizado.abonos) {
-            pagadoTotal = pedidoActualizado.abonos.reduce((sum, a) => sum + Number(a.monto), 0);
-        } else {
-            pagadoTotal = pedidoActualizado ? pedidoActualizado.pagado : 0;
-        }
-        if (pagadoTotal >= monto) {
-            closeMesaModal();
-        } else {
-            await clickMesa(num, idPedido, estado, monto, pagadoTotal);
-        }
+      // Verifica si ya está pagado todo
+      const pedidoActualizado = await db.pedidos.get(idPedido);
+      let pagadoTotal = 0;
+      if (pedidoActualizado && pedidoActualizado.abonos) {
+        pagadoTotal = pedidoActualizado.abonos.reduce((sum, a) => sum + Number(a.monto), 0);
+      } else {
+        pagadoTotal = pedidoActualizado ? pedidoActualizado.pagado : 0;
+      }
+      if (pagadoTotal >= monto) {
+        closeMesaModal();
+      } else {
+        await clickMesa(num, idPedido, estado, monto, pagadoTotal);
+      }
     };
+  }
 }
 
+window.agregarPlatosModal = async function(idPedido, num) {
+    const pedido = await db.pedidos.get(idPedido);
+    if (!pedido) { showMessage('Pedido no encontrado', 'error'); return; }
+    let pedidoDetalle = pedido.detalle ? [...pedido.detalle] : [];
 
+    let htmlForm = `
+        <h3>Agregar platos a Mesa ${num}</h3>
+        <form id="agregarPlatosForm" autocomplete="off" style="margin:0">
+            <div class="pedido-row">
+                <div class="pedido-col producto">
+                    <label for="productoInputAgregar">Producto:</label>
+                    <div class="autocomplete-container" style="position:relative;">
+                        <input type="text" id="productoInputAgregar" placeholder="Escribe para buscar..." autocomplete="off" />
+                        <div id="autocompleteListAgregar" class="autocomplete-items"></div>
+                    </div>
+                </div>
+                <div class="pedido-col cantidad">
+                    <label for="cantidadInputAgregar">Cantidad:</label>
+                    <input type="number" id="cantidadInputAgregar" min="1" value="1" />
+                </div>
+                <div class="pedido-col agregar">
+                    <button type="button" id="agregarBtnAgregar" class="btn-agregar">+ Agregar</button>
+                </div>
+            </div>
+            <div class="pedido-tabla-wrap">
+                <table id="tablaPedidoAgregar">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Cant.</th>
+                            <th>Precio</th>
+                            <th>Subtotal</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="pedido-total-row">
+                <span>Total:</span>
+                <span id="pedidoTotalAgregar" class="pedido-total-valor">S/ 0.00</span>
+            </div>
+            <button type="submit" class="btn-registro">Guardar cambios</button>
+            <button type="button" onclick="closeMesaModal()" class="btn-cancelar">Cancelar</button>
+        </form>
+    `;
+    showMesaModal(htmlForm);
 
+    // ------- AUTOCOMPLETADO CORRECTO ---------
+    const productoInputAgregar = document.getElementById('productoInputAgregar');
+    const autocompleteListAgregar = document.getElementById('autocompleteListAgregar');
+    let productoSeleccionadoAgregar = null;
 
+    productoInputAgregar.oninput = function () {
+        let val = this.value.trim().toLowerCase();
+        autocompleteListAgregar.innerHTML = '';
+        autocompleteListAgregar.style.display = 'none';
+        if (!val) return;
+        const sugerencias = catalogoArray.filter(p => p.nombre.toLowerCase().includes(val));
+        sugerencias.forEach(prod => {
+            let div = document.createElement('div');
+            div.textContent = prod.nombre + " (S/ " + prod.precio.toFixed(2) + ")";
+            div.onclick = function () {
+                productoInputAgregar.value = prod.nombre;
+                productoSeleccionadoAgregar = prod;
+                autocompleteListAgregar.innerHTML = '';
+                autocompleteListAgregar.style.display = 'none';
+            };
+            autocompleteListAgregar.appendChild(div);
+        });
+        if (sugerencias.length) {
+            autocompleteListAgregar.style.display = 'block';
+        }
+    };
+    // Oculta cuando pierdes foco
+    productoInputAgregar.onblur = function () { setTimeout(() => autocompleteListAgregar.style.display = 'none', 150); };
+
+    // -------- AGREGAR PRODUCTO AL PEDIDO ---------
+    document.getElementById('agregarBtnAgregar').onclick = function() {
+        const nombre = productoInputAgregar.value.trim();
+        const cant = parseInt(document.getElementById('cantidadInputAgregar').value, 10) || 1;
+        let prod = catalogoArray.find(p => p.nombre.toLowerCase() === nombre.toLowerCase());
+        if (!prod) {
+            showMessage('Selecciona un producto válido', 'error');
+            return;
+        }
+        let existente = pedidoDetalle.find(p => p.id === prod.id);
+        if (existente) {
+            existente.cantidad += cant;
+        } else {
+            pedidoDetalle.push({ ...prod, cantidad: cant });
+        }
+        productoInputAgregar.value = '';
+        productoSeleccionadoAgregar = null;
+        renderTablaPedidoAgregar();
+    };
+
+    function renderTablaPedidoAgregar() {
+        const tbody = document.getElementById('tablaPedidoAgregar').querySelector('tbody');
+        tbody.innerHTML = '';
+        let total = 0;
+        pedidoDetalle.forEach((prod, idx) => {
+            let sub = prod.precio * prod.cantidad;
+            total += sub;
+            let tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${prod.nombre}</td>
+                <td>${prod.cantidad}</td>
+                <td>S/ ${prod.precio.toFixed(2)}</td>
+                <td>S/ ${sub.toFixed(2)}</td>
+                <td>
+                    <button type="button" style="color:#e74c3c;font-size:1.1em;" onclick="this.closest('tr').remove();pedidoDetalle.splice(${idx},1);renderTablaPedidoAgregar();">🗑️</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+        document.getElementById('pedidoTotalAgregar').innerText = "S/ " + total.toFixed(2);
+    }
+    renderTablaPedidoAgregar();
+
+    // --------- SUBMIT AGREGAR PLATOS ---------
+    document.getElementById('agregarPlatosForm').onsubmit = async function(e) {
+        e.preventDefault();
+        let detalle = [...pedidoDetalle];
+        let total = detalle.reduce((sum, item) => sum + item.precio * item.cantidad, 0);
+        if (detalle.length === 0) {
+            showMessage("Debe agregar al menos un producto.", "error");
+            return;
+        }
+        await db.pedidos.update(idPedido, { detalle: detalle, monto: total });
+        await renderMesas();
+        await updateStats();
+        await updateResumenPagadosTable();
+        showMessage('Platos agregados correctamente.');
+        closeMesaModal();
+    };
+};
 
 
 async function crearPedido(num, monto, detalle=[]) {
@@ -552,28 +779,7 @@ async function abonarPedido(idPedido, abono, tipo_pago, monto, pagado, num) {
     showMessage(`Pago registrado para mesa ${num}`);
 }
 
-window.editarPedidoModal = async function(idPedido, num, monto) {
-    showMesaModal(`
-        <h3>Editar monto Mesa ${num}</h3>
-        <form id="editarPedidoForm" autocomplete="off">
-            <label>Nuevo monto:<br>
-                <input type="number" min="0.01" step="0.01" name="monto" value="${monto}" required style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
-            </label><br>
-            <button type="submit" class="btn" style="margin-top:12px;">Actualizar</button>
-            <button type="button" onclick="closeMesaModal()" class="btn-secondary" style="margin-top:12px;">Cancelar</button>
-        </form>
-    `);
-    document.getElementById('editarPedidoForm').onsubmit = async function(e) {
-        e.preventDefault();
-        const nuevoMonto = parseFloat(this.monto.value);
-        await db.pedidos.update(idPedido, { monto: nuevoMonto });
-        await renderMesas();
-        await updateStats();
-        await updateResumenPagadosTable();
-        showMessage('Monto actualizado.');
-        closeMesaModal();
-    };
-};
+
 window.anularPedido = async function(idPedido, num) {
     if (confirm(`¿Anular pedido de Mesa ${num}? Esta acción no se puede deshacer.`)) {
         await db.pedidos.delete(idPedido);
@@ -777,14 +983,6 @@ document.getElementById('btnGenerarReporte').onclick = async function() {
     html += '</tbody></table>';
     document.getElementById('tablaReporte').innerHTML = html;
 };
-// Deja SOLO este window.onload para evitar duplicados
-window.onload = async () => {
-    const today = (new Date()).toISOString().slice(0, 10);
-    document.getElementById('fechaInicio').value = today;
-    document.getElementById('fechaFin').value = today;
-    await cerrarCajaAnteriorSiCorresponde();
-    await initApp();
-};
 
 /* --------- Exportar/Importar/Limpiar BD --------- */
 document.getElementById('btnExportarBD').onclick = async function() {
@@ -833,3 +1031,16 @@ document.getElementById('btnLimpiarBD').onclick = async function() {
     await updateResumenPagadosTable();
     showMessage('Base de datos limpiada');
 };
+window.onload = async function() {
+    // Oculta campo nombre moso al inicio
+    document.getElementById('nombreMosoBox').style.display = 'none';
+    // Setea fechas por defecto para reportes
+    const today = (new Date()).toISOString().slice(0, 10);
+    document.getElementById('fechaInicio').value = today;
+    document.getElementById('fechaFin').value = today;
+    // Cierra caja si corresponde antes de todo
+    await cerrarCajaAnteriorSiCorresponde();
+    // Muestra solo el login, y NO inicializa app ni muestra la vista principal hasta login correcto
+    mostrarLogin();
+};
+

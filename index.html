@@ -7,7 +7,7 @@
     <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#667eea">
-    <link rel="stylesheet" href="styles.css?v=1.0.1">
+    <link rel="stylesheet" href="styles.css?v=1.0.2">
 </head>
 <body>
 <div class="container">
@@ -19,7 +19,7 @@
     </div>
     <div id="loadingMessage" class="loading">Inicializando base de datos...</div>
     <div id="mainApp" style="display:none;">
-        <div class="form-section">
+        <div class="form-section solo-caja">
             <h2>💰 Configuración Inicial</h2>
             <div class="form-group">
                 <label for="cajaApertura">Caja de Apertura (S/.):</label>
@@ -30,7 +30,7 @@
         <h2 style="margin-top:25px; text-align:center;">🪑 MESAS</h2>
         <div class="mesas-y-especiales">
             <div class="mesas-grid" id="mesasGrid"></div>
-            <div class="pedido-especial-box">
+            <div class="pedido-especial-box solo-caja" id="boxParaLlevar">
                 <button class="btn-pedido-especial" id="btnParaLlevar">
                     🛍️<br>Para Llevar
                 </button>
@@ -41,7 +41,7 @@
                     <tbody></tbody>
                 </table>
             </div>
-            <div class="pedido-especial-box">
+            <div class="pedido-especial-box solo-caja" id="boxDelivery">
                 <button class="btn-pedido-especial" id="btnDelivery">
                     🏍️<br>Delivery
                 </button>
@@ -53,7 +53,7 @@
                 </table>
             </div>
         </div>
-        <div class="stats-grid">
+        <div class="stats-grid solo-caja">
             <div class="summary-cards">
                 <div class="summary-card efectivo">
                     <h3>💵 Efectivo</h3>
@@ -78,16 +78,17 @@
             </div>
         </div>
     </div>
+    <button id="btnCambiarUsuario" style="position:fixed;top:22px;right:28px;z-index:8000;display:none" class="btn-secondary">Cambiar usuario</button>
 </div>
 <div id="mesaModal" style="display:none; position:fixed; z-index:3000; left:0; top:0; width:100vw; height:100vh; background:rgba(0,0,0,0.27); align-items:center; justify-content:center;">
-    <div id="mesaModalContent" style="background:#fff; padding:30px 24px; border-radius:16px; min-width:310px; min-height:150px; box-shadow:0 8px 40px rgba(52,52,52,0.16); position:relative;">
+    <div id="mesaModalContent" style="background:#fff; padding:30px 24px; border-radius:16px; min-width:310px; min-height:150px; box-shadow:0 8px 40px rgba(0, 0, 0, 0.16);">
     </div>
 </div>
-<div class="resumen-pagados-section">
+<div class="resumen-pagados-section solo-caja">
   <h2 style="margin:20px 0 10px 0; font-size:1.3em">🧾 Resumen de pedidos pagados</h2>
   <div id="resumenPagadosTable"></div>
 </div>
-<div class="reports-section">
+<div class="reports-section solo-caja">
     <h2>📊 Reportes</h2>
     <div class="date-filter">
         <div>
@@ -102,12 +103,38 @@
     </div>
     <div id="tablaReporte"></div>
 </div>
-<div class="db-actions">
+<div class="db-actions solo-caja">
     <button class="btn-database" id="btnExportarBD">Exportar BD</button>
     <button class="btn-database" id="btnImportarBD">Importar BD</button>
     <button class="btn-database" id="btnLimpiarBD">Limpiar BD</button>
     <input type="file" id="fileImportarBD" style="display:none;" accept=".json" />
 </div>
+<!-- Modal de Login -->
+<div id="loginModal" style="position:fixed;z-index:9999;left:0;top:0;width:100vw;height:100vh;background:#fff;display:flex;align-items:center;justify-content:center;">
+  <form id="loginForm" style="min-width:280px;padding:28px 24px;border-radius:12px;background:#eee;box-shadow:0 3px 18px #0003;">
+    <h2 style="margin-bottom:14px;text-align:center;">Iniciar sesión</h2>
+    
+    <label for="usuario" style="font-weight:500;">Usuario</label>
+    <select id="usuario" style="width:100%;margin-bottom:12px;padding:7px;border-radius:8px;">
+      <option value="caja">Caja</option>
+      <option value="moso">Moso</option>
+    </select>
+    
+    <div id="nombreMosoBox" style="display:none;">
+      <label for="nombreMoso" style="font-weight:500;">Nombre del moso</label>
+      <input type="text" id="nombreMoso" placeholder="Nombre" style="width:100%;margin-bottom:14px;padding:7px;border-radius:8px;">
+    </div>
+    
+    <label for="clave" style="font-weight:500;">Clave</label>
+    <input type="password" id="clave" placeholder="Clave" required style="width:100%;margin-bottom:14px;padding:7px;border-radius:8px;">
+    
+    <button type="submit" class="btn" style="width:100%;margin-bottom:7px;">Entrar</button>
+  </form>
+  
+</div>
+
+
+
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -117,6 +144,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script src="app.js?v=1.0.1"></script>
+<script src="app.js?v=1.0.2"></script>
 </body>
 </html>
