@@ -1,8 +1,10 @@
 // Claves simples para ejemplo. Cambia a gusto.
 const USUARIOS = {
   caja:   { clave: "1234" },
-  moso:   { clave: "moso" } // clave común para todos los mosos
+  moso:   { clave: "moso" },
+  cocina: { clave: "cocina" }
 };
+
 let usuarioActual = null;        // "caja" o "moso"
 let nombreMosoActual = null;     // nombre/alias del moso actual
 
@@ -21,6 +23,7 @@ usuarioSelect.addEventListener('change', function() {
     }
 });
 
+
 // LOGIN
 function mostrarLogin() {
   document.getElementById('loginModal').style.display = 'flex';
@@ -38,7 +41,6 @@ document.getElementById('loginForm').onsubmit = function(e) {
   e.preventDefault();
   const usuario = document.getElementById('usuario').value;
   const clave = document.getElementById('clave').value;
-  // Si es moso, debe llenar nombre de moso
   if (usuario === 'moso') {
       let nombre = nombreMosoInput.value.trim();
       if (!nombre) {
@@ -55,11 +57,15 @@ document.getElementById('loginForm').onsubmit = function(e) {
     ocultarLogin();
     initApp();
     document.getElementById('clave').value = "";
+    // <<<<< AQUÍ! Activa autoupdate para cocina >>>>>
+    if(usuarioActual === "cocina") activarAutoUpdateCocina();
+    else if(cocinaInterval) clearInterval(cocinaInterval); // limpia si no es cocina
   } else {
     alert("Usuario o clave incorrecta.");
     document.getElementById('clave').value = "";
   }
 };
+
 
 // Permite cambiar usuario con botón
 document.getElementById('btnCambiarUsuario').onclick = function() {
@@ -70,14 +76,29 @@ document.getElementById('btnCambiarUsuario').onclick = function() {
 
 // Controla UI por rol
 function configurarUIporUsuario() {
-  // Solo caja ve .solo-caja (reportes, caja, resumen, pedidos especiales)
   const esCaja = usuarioActual === "caja";
+  const esMoso = usuarioActual === "moso";
+  const esCocina = usuarioActual === "cocina";
+
+  // Elementos solo para caja
   document.querySelectorAll('.solo-caja').forEach(el => el.style.display = esCaja ? '' : 'none');
-  // Solo caja ve pedidos especiales (para llevar, delivery)
+  // Pedidos especiales (solo caja)
   document.querySelectorAll('.pedido-especial-box').forEach(el => el.style.display = esCaja ? '' : 'none');
-  // Si tienes elementos solo para mosos (opcional)
-  document.querySelectorAll('.solo-moso').forEach(el => el.style.display = !esCaja ? '' : 'none');
+  // Solo mosos (si tienes)
+  document.querySelectorAll('.solo-moso').forEach(el => el.style.display = esMoso ? '' : 'none');
+  // Mostrar/ocultar la vista de cocina
+  const vistaCocina = document.getElementById('vistaCocina');
+  if (vistaCocina) vistaCocina.style.display = esCocina ? '' : 'none';
+  // Oculta el resto de la app si es cocina (opcional, puedes mostrar solo la vista de cocina)
+  document.getElementById('mainApp').style.display = esCocina ? 'none' : 'block';
+
+  // Renderiza comandas si es cocina
+  if (esCocina && typeof renderComandasCocina === "function") {
+    renderComandasCocina();
+    activarAutoUpdateCocina && activarAutoUpdateCocina();
+  }
 }
+
 
 /* --------- Dexie DB setup --------- */
 
@@ -221,6 +242,117 @@ function closeMesaModal() {
     if(document.getElementById('autocompleteList')) document.getElementById('autocompleteList').style.display = 'none';
     if(document.getElementById('autocompleteListAgregar')) document.getElementById('autocompleteListAgregar').style.display = 'none';
 }
+async function renderComandasCocina() {
+    const cont = document.getElementById('listaComandas');
+    cont.innerHTML = '<div style="color:#888;">Cargando comandas...</div>';
+    const today = new Date().toISOString().split('T')[0];
+    // Solo muestra pedidos NO libres y NO listos
+    const pedidos = await db.pedidos
+      .where("fecha").equals(today)
+      .filter(p => p.estado !== "libre" && p.estado !== "listo")
+      .toArray();
+
+    if (!pedidos.length) {
+        cont.innerHTML = '<div style="color:#888;padding:25px;text-align:center;">No hay comandas pendientes.</div>';
+        return;
+    }
+
+    cont.innerHTML = pedidos.map(p => {
+        let mesa = p.mesa === 0
+            ? (p.tipo_pedido === "para llevar" ? "Para Llevar"
+                : p.tipo_pedido === "delivery" ? "Delivery" : "Especial")
+            : "M" + p.mesa.toString().padStart(2, '0');
+        return `
+        <div class="comanda-card" style="background:#fff6e6;box-shadow:0 2px 10px #0001;padding:17px 14px;margin:15px 0;border-radius:13px;">
+          <b>${mesa}</b> | ${p.nombre ? p.nombre : ''}<br>
+          <b>Hora:</b> ${p.hora}<br>
+          <b>Platos:</b>
+          <ul style="margin-left:18px;">
+            ${(p.detalle||[]).map((item,i) => 
+              `<li>${item.cantidad} x ${item.nombre} <span style="color:#aaa">[S/ ${item.precio.toFixed(2)}]</span>
+                ${item.listo ? '<span style="color:green;font-weight:600;">Listo</span>'
+                  : `<button onclick="marcarPlatoListo(${p.id},${i})" style="margin-left:10px;" class="btn-secondary btn-xs">Marcar listo</button>`}
+              </li>`
+            ).join('')}
+          </ul>
+          <button onclick="marcarPedidoListo(${p.id})" class="btn" style="margin-top:8px;">Marcar todo pedido listo</button>
+        </div>
+        `;
+    }).join('');
+}
+
+
+
+window.marcarPlatoListo = async function(idPedido, idx) {
+    const pedido = await db.pedidos.get(idPedido);
+    if (!pedido) return;
+    if (!pedido.detalle || !pedido.detalle[idx]) return;
+    pedido.detalle[idx].listo = true;
+    pedido.detalle[idx].estado = "listo"; // opcional
+    await db.pedidos.update(idPedido, { detalle: pedido.detalle });
+    await renderComandasCocina();
+};
+
+
+window.marcarPedidoListo = async function(idPedido) {
+    const pedido = await db.pedidos.get(idPedido);
+    if (!pedido) return;
+    if (!pedido.detalle) return;
+    // Marca TODOS los platos como listos
+    pedido.detalle.forEach(item => {
+        item.listo = true;    // <-- usa 'listo', no 'estado'
+        item.estado = "listo"; // opcional: mantén ambos si quieres compatibilidad
+        item.notificado = false;
+    });
+    // Cambia el estado del pedido a "listo"
+    await db.pedidos.update(idPedido, {
+        detalle: pedido.detalle,
+        estado: "listo"
+    });
+    await renderComandasCocina();
+};
+
+    let alertaTimeout = null;
+
+function mostrarAlertaPedidoListo(mensaje) {
+  document.getElementById('alertaMsg').innerText = mensaje;
+  document.getElementById('alertaPedidoListo').style.display = 'block';
+  let progreso = 0;
+  document.getElementById('barraProgreso').style.width = '0%';
+  if(alertaTimeout) clearInterval(alertaTimeout);
+  alertaTimeout = setInterval(()=>{
+    progreso += 2; // 2% cada 0.1s => 5s
+    document.getElementById('barraProgreso').style.width = progreso + '%';
+    if(progreso >= 100) clearInterval(alertaTimeout);
+  }, 100);
+}
+
+function cerrarAlertaPedidoListo() {
+  document.getElementById('alertaPedidoListo').style.display = 'none';
+  if(alertaTimeout) clearInterval(alertaTimeout);
+  document.getElementById('barraProgreso').style.width = '0%';
+}
+
+async function revisarPedidosListosParaMoso() {
+  if (usuarioActual !== "moso") return;
+  const today = new Date().toISOString().split('T')[0];
+  const pedidos = await db.pedidos.where({ fecha: today, creado_por: nombreMosoActual }).toArray();
+  pedidos.forEach(ped => {
+    if(ped.detalle) {
+      ped.detalle.forEach(plato => {
+        // Si el plato recién está marcado como listo y no se notificó...
+        if(plato.estado === "listo" && !plato.notificado) {
+          mostrarAlertaPedidoListo(`¡El plato "${plato.nombre}" de la Mesa ${ped.mesa} está listo para recoger!`);
+          // Marca como notificado para no mostrar varias veces
+          plato.notificado = true;
+        }
+      });
+      // Guarda cambios en Dexie
+      db.pedidos.update(ped.id, { detalle: ped.detalle });
+    }
+  });
+}
+setInterval(revisarPedidosListosParaMoso, 2500);
 
 
 /* --------- Pedidos especiales --------- */
@@ -740,13 +872,15 @@ async function crearPedido(num, monto, detalle=[]) {
     const tipo_pedido = "mesa";
     await db.pedidos.add({
         fecha, hora, mesa: num, monto, tipo_pedido, tipo_pago: '', pagado: 0, estado: "ocupada", timestamp,
-        detalle // <--- guarda el detalle completo
+        detalle, // <--- detalle de platos
+        creado_por: usuarioActual === 'moso' ? nombreMosoActual : null  // <--- agrega esto
     });
     await renderMesas();
     await updateStats();
     await updateResumenPagadosTable();
     showMessage('Pedido creado para mesa ' + num);
 }
+
 
 
 async function abonarPedido(idPedido, abono, tipo_pago, monto, pagado, num) {
@@ -1031,6 +1165,8 @@ document.getElementById('btnLimpiarBD').onclick = async function() {
     await updateResumenPagadosTable();
     showMessage('Base de datos limpiada');
 };
+window.addEventListener('offline', () => alert('Estás sin conexión, pero puedes seguir trabajando. Los datos se guardan en el dispositivo.'));
+
 window.onload = async function() {
     // Oculta campo nombre moso al inicio
     document.getElementById('nombreMosoBox').style.display = 'none';

@@ -118,6 +118,7 @@
     <select id="usuario" style="width:100%;margin-bottom:12px;padding:7px;border-radius:8px;">
       <option value="caja">Caja</option>
       <option value="moso">Moso</option>
+      <option value="cocina">Cocina</option>
     </select>
     
     <div id="nombreMosoBox" style="display:none;">
@@ -130,9 +131,34 @@
     
     <button type="submit" class="btn" style="width:100%;margin-bottom:7px;">Entrar</button>
   </form>
-  
 </div>
 
+<div id="vistaCocina" style="display:none;max-width:900px;margin:auto;">
+  <h2>👨‍🍳 Comandas de cocina</h2>
+  <div id="listaComandas"></div>
+</div>
+<div id="alertaPedidoListo" style="
+    display:none;
+    position:fixed;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    background:#3fa943;
+    color:#fff;
+    padding:22px 38px;
+    border-radius:16px;
+    box-shadow:0 6px 24px #0005;
+    z-index:9000;
+    min-width:220px;
+    max-width:90vw;
+    text-align:center;
+">
+  <div id="alertaMsg"></div>
+  <div id="barraCarga" style="margin-top:12px; background:#fff3; border-radius:8px; height:9px; width:100%;">
+    <div id="barraProgreso" style="height:100%; background:#fff; width:0%; border-radius:8px;"></div>
+  </div>
+  <button onclick="cerrarAlertaPedidoListo()" style="margin-top:10px; background:#fff2; border:none; color:#fff; border-radius:6px; padding:4px 16px; cursor:pointer;">Cerrar</button>
+</div>
 
 
 <script>
