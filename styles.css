@@ -849,6 +849,13 @@ width: 100%;
 .autocomplete-items > div:hover {
     background: #eaf6f3;
 }
+.visual-notification {
+    animation: noti-in 0.23s ease;
+}
+@keyframes noti-in {
+    from { opacity: 0; transform: translateY(-30px) scale(0.9); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
 
 
 }

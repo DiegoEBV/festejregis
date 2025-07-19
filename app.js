@@ -52,27 +52,40 @@ document.getElementById('loginForm').onsubmit = function(e) {
   } else {
       nombreMosoActual = null;
   }
-  if (USUARIOS[usuario] && clave === USUARIOS[usuario].clave) {
-    usuarioActual = usuario;
-    ocultarLogin();
-    initApp();
-    document.getElementById('clave').value = "";
-    // <<<<< AQUÍ! Activa autoupdate para cocina >>>>>
-    if(usuarioActual === "cocina") activarAutoUpdateCocina();
-    else if(cocinaInterval) clearInterval(cocinaInterval); // limpia si no es cocina
-  } else {
-    alert("Usuario o clave incorrecta.");
-    document.getElementById('clave').value = "";
-  }
+    if (USUARIOS[usuario] && clave === USUARIOS[usuario].clave) {
+        usuarioActual = usuario;
+        if (usuario === 'moso') {
+            nombreMosoActual = nombreMosoInput.value.trim();
+            localStorage.setItem('nombreMosoActual', nombreMosoActual);
+        } else {
+            nombreMosoActual = null;
+            localStorage.removeItem('nombreMosoActual');
+        }
+        // Guarda usuario logueado
+        localStorage.setItem('usuarioActual', usuarioActual);
+
+        ocultarLogin();
+        initApp();
+        document.getElementById('clave').value = "";
+        if(usuarioActual === "cocina") activarAutoUpdateCocina();
+        else if(cocinaInterval) clearInterval(cocinaInterval);
+    } else {
+        alert("Usuario o clave incorrecta.");
+        document.getElementById('clave').value = "";
+    }
+
 };
 
 
 // Permite cambiar usuario con botón
 document.getElementById('btnCambiarUsuario').onclick = function() {
-  usuarioActual = null;
-  nombreMosoActual = null;
-  mostrarLogin();
+    usuarioActual = null;
+    nombreMosoActual = null;
+    localStorage.removeItem('usuarioActual');
+    localStorage.removeItem('nombreMosoActual');
+    mostrarLogin();
 };
+
 
 // Controla UI por rol
 function configurarUIporUsuario() {
@@ -97,6 +110,26 @@ function configurarUIporUsuario() {
     renderComandasCocina();
     activarAutoUpdateCocina && activarAutoUpdateCocina();
   }
+}
+let socket = null;
+
+function conectarSocket(rol) {
+    socket = io("http://localhost:4000"); // Cambia a tu IP/LAN si es necesario
+    socket.emit("identificarse", rol);
+
+    // Recibe eventos según el rol
+    if (rol === 'caja') {
+        socket.on('pedidoRecibido', pedido => {
+            // Aquí actualizas la UI de caja en tiempo real
+            showMessage("Nuevo pedido recibido: Mesa " + pedido.mesa);
+            // ...actualiza tablas, etc.
+        });
+    }
+    if (rol === 'moso') {
+        socket.on('respuestaDeCaja', datos => {
+            showMessage("Caja respondió: " + JSON.stringify(datos));
+        });
+    }
 }
 
 
@@ -182,10 +215,12 @@ function setCurrentDate() {
 function showMessage(msg, type = 'success') {
     let msgDiv = document.createElement('div');
     msgDiv.className = type;
-    msgDiv.textContent = msg;
+    // Usa innerHTML en vez de textContent para que acepte HTML
+    msgDiv.innerHTML = msg;
     document.body.appendChild(msgDiv);
     setTimeout(() => { msgDiv.remove(); }, 3500);
 }
+
 
 async function cerrarCajaAnteriorSiCorresponde() {
     const hoy = (new Date()).toISOString().slice(0, 10);
@@ -281,6 +316,65 @@ async function renderComandasCocina() {
     }).join('');
 }
 
+// ---- NOTIFICACIÓN VISUAL/SONORA ----
+function playNotificationSound() {
+    // Puedes reemplazar por cualquier sonido .mp3 o .wav local o en internet.
+    let audio = document.getElementById('audioNoti');
+    if (!audio) {
+        audio = document.createElement('audio');
+        audio.id = 'audioNoti';
+        audio.src = 'https://cdn.pixabay.com/audio/2022/03/15/audio_115b9e5061.mp3'; // Sonido gratuito corto
+        document.body.appendChild(audio);
+    }
+    audio.currentTime = 0;
+    audio.play();
+}
+
+function showVisualNotification(msg) {
+    let div = document.createElement('div');
+    div.className = 'visual-notification';
+    div.innerText = msg;
+    Object.assign(div.style, {
+        position: 'fixed',
+        top: '20px', left: '50%', transform: 'translateX(-50%)',
+        background: '#222', color: 'white',
+        padding: '16px 32px',
+        borderRadius: '18px', zIndex: 9999,
+        fontSize: '1.25em', boxShadow: '0 4px 32px #0005'
+    });
+    document.body.appendChild(div);
+    setTimeout(() => div.remove(), 3300);
+}
+// ========== NOTIFICACIÓN DE PEDIDO DEMORADO ==========
+
+// Para evitar notificaciones duplicadas, guarda los IDs ya notificados
+let pedidosDemoradosNotificados = new Set();
+
+setInterval(async () => {
+    if (usuarioActual !== "cocina") return;
+    const minutosDemora = 25; // Cambia aquí el tiempo (en minutos) para considerar un pedido demorado
+    const now = Date.now();
+    const today = new Date().toISOString().split('T')[0];
+    const pedidos = await db.pedidos
+        .where("fecha").equals(today)
+        .filter(p => p.estado !== "libre" && p.estado !== "listo")
+        .toArray();
+
+    pedidos.forEach(p => {
+        let t1 = new Date(p.timestamp).getTime();
+        if ((now - t1) / 60000 > minutosDemora) {
+            if (!pedidosDemoradosNotificados.has(p.id)) {
+                playNotificationSound();
+                showVisualNotification(`¡Atención! Pedido de mesa ${p.mesa || '-'} lleva más de ${minutosDemora} min.`);
+                pedidosDemoradosNotificados.add(p.id);
+            }
+        }
+        // Si el pedido ya no está demorado, lo quitamos del set (por si se reactiva)
+        else {
+            pedidosDemoradosNotificados.delete(p.id);
+        }
+    });
+}, 180000); // Cada 3 minutos (ajusta si quieres más frecuente)
 
 
 window.marcarPlatoListo = async function(idPedido, idx) {
@@ -387,6 +481,7 @@ async function crearPedidoEspecial(tipoPedido, nombre, monto) {
     const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
     const timestamp = new Date().toISOString();
     await db.pedidos.add({
+        enviado_cocina: false,
         fecha, hora, mesa: 0, monto,
         tipo_pedido: tipoPedido, tipo_pago: '', pagado: 0,
         estado: "ocupada", timestamp, nombre
@@ -453,6 +548,45 @@ window.abrirPagoPedidoEspecial = function(idPedido, tipoPedido) {
         closeMesaModal();
     };
 };
+
+async function enviarPedidoACocina(pedidoId) {
+    const pedido = await db.pedidos.get(pedidoId);
+    if (!pedido) return;
+    // Aquí tu lógica de impresión
+    imprimirComandaCocina(pedido); // la función que imprime
+    await db.pedidos.update(pedidoId, { enviado_cocina: true });
+    showMessage("Comanda enviada a cocina e impresa.");
+}
+function imprimirComandaCocina(pedido) {
+    let mesa = pedido.mesa === 0 ? (pedido.tipo_pedido || "Especial") : "M" + pedido.mesa.toString().padStart(2, '0');
+    let html = `
+      <div style="font-family:monospace;font-size:18px;">
+        <h2 style="text-align:center;">COMANDA COCINA</h2>
+        <b>Mesa:</b> ${mesa} <br>
+        <b>Mozo:</b> ${pedido.creado_por || '-'}<br>
+        <b>Hora:</b> ${pedido.hora} <br>
+        <b>Observación:</b> ${pedido.observacion || '-'} <br>
+        <hr>
+        <ul style="padding-left:0;list-style:none;">
+          ${(pedido.detalle||[]).map(item=>`<li>${item.cantidad} x ${item.nombre}</li>`).join('')}
+        </ul>
+      </div>
+    `;
+    let w = window.open('', '', 'width=450,height=600');
+    w.document.write(`<html><head><title>Comanda Cocina</title></head><body>${html}<script>window.print();setTimeout(()=>window.close(),500);</script></body></html>`);
+    w.document.close();
+}
+setInterval(async () => {
+    const pedidos = await db.pedidos.where({ enviado_cocina: false }).toArray();
+    const now = Date.now();
+    pedidos.forEach(p => {
+        let t1 = new Date(p.timestamp).getTime();
+        if ((now - t1) > 2 * 60000) { // 2 minutos
+            enviarPedidoACocina(p.id);
+        }
+    });
+}, 30000); // Revisa cada 30 segundos
+
 
 // CORREGIDO: Cambia pagado: Dexie.minKey por pagado: monto
 window.pagarPedidoEspecial = async function(idPedido, tipoPedido, tipo_pago) {
@@ -523,6 +657,10 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
                 <div class="pedido-total-row">
                     <span>Total:</span>
                     <span id="pedidoTotal" class="pedido-total-valor">S/ 0.00</span>
+                </div>
+                <div style="margin:8px 0 12px 0;">
+                    <label for="observacionInput">Observación o comentario:</label>
+                    <textarea id="observacionInput" rows="2" style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;"></textarea>
                 </div>
                 <button type="submit" class="btn-registro">Registrar Pedido</button>
                 <button type="button" onclick="closeMesaModal()" class="btn-cancelar">Cancelar</button>
@@ -616,9 +754,12 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
                 showMessage("Debe agregar al menos un producto.", "error");
                 return;
             }
-            await crearPedido(num, total, detalle);
+            // OBTIENE EL COMENTARIO
+            let observacion = document.getElementById('observacionInput').value.trim();
+            await crearPedido(num, total, detalle, observacion);
             closeMesaModal();
         };
+
 
         return; // ---- IMPORTANTE: salir aquí si es nuevo pedido ----
     }
@@ -859,7 +1000,7 @@ window.agregarPlatosModal = async function(idPedido, num) {
 };
 
 
-async function crearPedido(num, monto, detalle=[]) {
+async function crearPedido(num, monto, detalle = [], observacion = "") {
     if (isNaN(monto) || monto <= 0) return;
     const fecha = new Date().toISOString().split('T')[0];
     const pedidosActivos = await db.pedidos.where({ fecha, mesa: num }).filter(p => p.estado !== "libre").toArray();
@@ -870,17 +1011,25 @@ async function crearPedido(num, monto, detalle=[]) {
     const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
     const timestamp = new Date().toISOString();
     const tipo_pedido = "mesa";
-    await db.pedidos.add({
+    const idNuevoPedido = await db.pedidos.add({
         fecha, hora, mesa: num, monto, tipo_pedido, tipo_pago: '', pagado: 0, estado: "ocupada", timestamp,
-        detalle, // <--- detalle de platos
-        creado_por: usuarioActual === 'moso' ? nombreMosoActual : null  // <--- agrega esto
+        detalle,
+        observacion,
+        creado_por: usuarioActual === 'moso' ? nombreMosoActual : null,
+        enviado_cocina: false
     });
+
+    // 🚦 Aquí notificas por socket si eres mozo
+    if (typeof socket !== 'undefined' && socket && usuarioActual === "moso") {
+        socket.emit('nuevoPedido', { mesa: num, detalle, observacion });
+    }
+
     await renderMesas();
     await updateStats();
     await updateResumenPagadosTable();
-    showMessage('Pedido creado para mesa ' + num);
+    showMessage(`Pedido creado para mesa ${num}. <button onclick="enviarPedidoACocina(${idNuevoPedido})" class="btn">Enviar a cocina</button>`);
+    return idNuevoPedido;
 }
-
 
 
 async function abonarPedido(idPedido, abono, tipo_pago, monto, pagado, num) {
@@ -998,16 +1147,36 @@ window.imprimirDetalleAbonos = async function(idPedido) {
             : pedido.tipo_pedido === "delivery" ? "Delivery" : "Especial")
         : "M" + pedido.mesa.toString().padStart(2, '0');
 
-    let html = `
-    <div style="font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;min-width:350px;">
-        <h2 style="text-align:center;margin-bottom:12px;">Detalle de Pedido</h2>
-        <b>Mesa/Pedido:</b> ${mesa} <br>
-        <b>Nombre:</b> ${nombre} <br>
-        <b>Monto Total:</b> S/ ${Number(pedido.monto).toFixed(2)}<br>
-        <b>Pagado:</b> S/ ${Number(pedido.pagado).toFixed(2)}<br>
-        <b>Falta:</b> S/ ${(Number(pedido.monto) - Number(pedido.pagado)).toFixed(2)}<br>
-        <hr style="margin:10px 0;">
-        <b>Abonos realizados:</b>
+    // Tabla de productos consumidos
+    let productosHTML = `
+        <b>Productos consumidos:</b>
+        <table border="1" cellpadding="7" cellspacing="0" style="width:100%;margin-top:8px;font-size:1em;">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>P. Unitario</th>
+                    <th>Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${(pedido.detalle || []).map((prod, i) => `
+                    <tr>
+                        <td style="text-align:center">${i + 1}</td>
+                        <td>${prod.nombre}</td>
+                        <td style="text-align:center">${prod.cantidad}</td>
+                        <td>S/ ${Number(prod.precio).toFixed(2)}</td>
+                        <td>S/ ${(prod.precio * prod.cantidad).toFixed(2)}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+
+    // Tabla de abonos realizados
+    let abonosHTML = `
+        <b>Pagos realizados:</b>
         <table border="1" cellpadding="7" cellspacing="0" style="width:100%;margin-top:8px;font-size:1em;">
             <thead>
                 <tr>
@@ -1028,17 +1197,38 @@ window.imprimirDetalleAbonos = async function(idPedido) {
                 `).join('')}
             </tbody>
         </table>
+    `;
+
+    // Total, pagado y pendiente
+    let totalHTML = `
+        <div style="margin:13px 0 7px 0;">
+            <b>Monto Total:</b> S/ ${Number(pedido.monto).toFixed(2)}<br>
+            <b>Pagado:</b> S/ ${Number(pedido.pagado).toFixed(2)}<br>
+            <b>Saldo pendiente:</b> S/ ${(Number(pedido.monto) - Number(pedido.pagado)).toFixed(2)}
+        </div>
+    `;
+
+    let html = `
+    <div style="font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;min-width:350px;">
+        <h2 style="text-align:center;margin-bottom:12px;">Detalle de Pedido</h2>
+        <b>Mesa/Pedido:</b> ${mesa} <br>
+        <b>Nombre:</b> ${nombre} <br>
+        ${productosHTML}
+        ${totalHTML}
+        <hr style="margin:10px 0;">
+        ${abonosHTML}
     </div>
     `;
-    // Abrir en nueva ventana lista para imprimir
-    let w = window.open('', '_blank', 'width=500,height=700');
+
+    let w = window.open('', '_blank', 'width=550,height=900');
     w.document.write(`
-        <html><head><title>Detalle de Abonos</title></head><body>${html}
+        <html><head><title>Detalle de Pedido</title></head><body>${html}
         <br><button onclick="window.print();">Imprimir</button>
         </body></html>
     `);
     w.document.close();
 };
+
 
 async function updateStats() {
     const today = new Date().toISOString().split('T')[0];
@@ -1168,15 +1358,24 @@ document.getElementById('btnLimpiarBD').onclick = async function() {
 window.addEventListener('offline', () => alert('Estás sin conexión, pero puedes seguir trabajando. Los datos se guardan en el dispositivo.'));
 
 window.onload = async function() {
-    // Oculta campo nombre moso al inicio
     document.getElementById('nombreMosoBox').style.display = 'none';
-    // Setea fechas por defecto para reportes
     const today = (new Date()).toISOString().slice(0, 10);
     document.getElementById('fechaInicio').value = today;
     document.getElementById('fechaFin').value = today;
-    // Cierra caja si corresponde antes de todo
     await cerrarCajaAnteriorSiCorresponde();
-    // Muestra solo el login, y NO inicializa app ni muestra la vista principal hasta login correcto
-    mostrarLogin();
+
+    // Revisa sesión guardada
+    usuarioActual = localStorage.getItem('usuarioActual');
+    nombreMosoActual = localStorage.getItem('nombreMosoActual');
+    if (usuarioActual) {
+        ocultarLogin();
+        initApp();
+        conectarSocket(usuarioActual);    // <---- AGREGADO AQUÍ
+        if(usuarioActual === "cocina") activarAutoUpdateCocina();
+        else if(typeof cocinaInterval !== "undefined" && cocinaInterval) clearInterval(cocinaInterval);
+    } else {
+        mostrarLogin();
+    }
 };
+
 
