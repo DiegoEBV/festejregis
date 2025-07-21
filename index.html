@@ -8,7 +8,7 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#667eea">
-    <link rel="stylesheet" href="styles.css?v=1.0.3">
+    <link rel="stylesheet" href="styles.css?v=1.0.4">
 </head>
 <body>
 <div class="container">
@@ -91,6 +91,24 @@
 </div>
 <div class="reports-section solo-caja">
     <h2>📊 Reportes</h2>
+<div id="resumenCuadros" style="display:none; margin-bottom: 20px;justify-content: center;" class="summary-cards">
+  <div class="summary-card verde">
+    💵 <b>Efectivo</b><br><span id="efectivoTotalReporte">S/ 0.00</span>
+  </div>
+  <div class="summary-card morado">
+    📲 <b>Yape</b><br><span id="yapeTotalReporte">S/ 0.00</span>
+  </div>
+  <div class="summary-card azul">
+    💳 <b>Tarjeta</b><br><span id="tarjetaTotalReporte">S/ 0.00</span>
+  </div>
+  <div class="summary-card naranja">
+    🧾 <b>Total del Día</b><br><span id="totalDiaReporte">S/ 0.00</span>
+  </div>
+  <div class="summary-card naranja">
+    📊 <b>Ganancia</b><br><span id="gananciaReporte">S/ 0.00</span>
+  </div>
+</div>
+
     <div class="date-filter">
         <div>
             <label for="fechaInicio">Fecha Inicio:</label>
@@ -171,6 +189,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script src="app.js?v=1.0.3"></script>
+<script src="app.js?v=1.0.4"></script>
 </body>
 </html>
