@@ -113,7 +113,7 @@ function configurarUIporUsuario() {
 }
 let socket = null;
 
-function conectarSocket(rol) {
+/*function conectarSocket(rol) {
     socket = io("http://localhost:4000"); // Cambia a tu IP/LAN si es necesario
     socket.emit("identificarse", rol);
 
@@ -130,7 +130,7 @@ function conectarSocket(rol) {
             showMessage("Caja respondió: " + JSON.stringify(datos));
         });
     }
-}
+}*/
 
 
 /* --------- Dexie DB setup --------- */
@@ -191,7 +191,7 @@ db.version(3).stores({
     configuracion: "++id,fecha,caja_apertura,cerrada,fecha_cierre"
 });
 
-const TOTAL_MESAS = 24;
+const TOTAL_MESAS = 27;
 const MESA_ESTADOS = { LIBRE: 'libre', OCUPADA: 'ocupada', PARCIAL: 'parcial' };
 
 async function initApp() {
@@ -233,11 +233,39 @@ async function cerrarCajaAnteriorSiCorresponde() {
         showMessage('La caja del día ' + ultimaCaja.fecha + ' fue cerrada automáticamente.', 'success');
     }
 }
+// Parte 1: Datos adicionales
+let mesasDivididas = {}; // Estructura: { 7: ['7A', '7B'], 12: ['12A', '12B'] }
+
+// Parte 2: Funciones para dividir y unir mesas
+function dividirMesa(baseNum) {
+    mesasDivididas[baseNum] = [`${baseNum}A`, `${baseNum}B`];
+    localStorage.setItem('mesasDivididas', JSON.stringify(mesasDivididas)); // <-- Guardar
+    closeMesaModal();
+    renderMesas();
+}
+
+function unirMesa(baseNum) {
+    delete mesasDivididas[baseNum];
+    localStorage.setItem('mesasDivididas', JSON.stringify(mesasDivididas)); // <-- Guardar
+    closeMesaModal();
+    renderMesas();
+}
+const savedMesasDivididas = localStorage.getItem('mesasDivididas');
+if (savedMesasDivididas) {
+    try {
+        mesasDivididas = JSON.parse(savedMesasDivididas);
+    } catch (e) {
+        console.error("Error al leer mesas divididas:", e);
+    }
+}
+
+
 
 /* ========== MESAS VISUAL GRID ========== */
 async function renderMesas() {
-    const grid = document.getElementById('mesasGrid');
-    grid.innerHTML = '';
+    const cont = document.getElementById("mesasGrid");
+    cont.innerHTML = "";
+
     const today = new Date().toISOString().split('T')[0];
     let pedidosArr = await db.pedidos.where("fecha").equals(today).toArray();
     let pedidos = {};
@@ -245,25 +273,69 @@ async function renderMesas() {
         if (!pedidos[p.mesa]) pedidos[p.mesa] = [];
         pedidos[p.mesa].push(p);
     });
-    for (let n = 1; n <= TOTAL_MESAS; n++) {
-        const mesaPedidos = pedidos[n] || [];
-        let estado = MESA_ESTADOS.LIBRE, monto = 0, pagado = 0, idPedido = null;
-        if (mesaPedidos.length > 0) {
-            const pedidoActivo = mesaPedidos.find(p => (p.monto > p.pagado));
-            if (pedidoActivo) {
-                estado = pedidoActivo.pagado === 0 ? MESA_ESTADOS.OCUPADA : MESA_ESTADOS.PARCIAL;
-                monto = pedidoActivo.monto;
-                pagado = pedidoActivo.pagado;
-                idPedido = pedidoActivo.id;
+
+    for (let n = 1; n <= 27; n++) {
+        if (mesasDivididas[n]) {
+            for (const sub of mesasDivididas[n]) {
+                let estado = MESA_ESTADOS.LIBRE, monto = 0, pagado = 0, idPedido = null;
+                const mesaPedidos = pedidos[sub] || [];
+                if (mesaPedidos.length > 0) {
+                    const pedidoActivo = mesaPedidos.find(p => (p.monto > p.pagado));
+                    if (pedidoActivo) {
+                        estado = pedidoActivo.pagado === 0 ? MESA_ESTADOS.OCUPADA : MESA_ESTADOS.PARCIAL;
+                        monto = pedidoActivo.monto;
+                        pagado = pedidoActivo.pagado;
+                        idPedido = pedidoActivo.id;
+                    }
+                }
+                const btn = document.createElement("button");
+                btn.className = 'mesa-btn ' + (estado === MESA_ESTADOS.LIBRE ? 'mesa-libre mesa-dividida' : estado === MESA_ESTADOS.OCUPADA ? 'mesa-ocupada mesa-dividida' : 'mesa-parcial mesa-dividida');
+                btn.innerHTML = `<div class="mesa-num">M${sub}</div>`
+                    + (estado !== MESA_ESTADOS.LIBRE ? `<span class="mesa-monto">S/ ${monto.toFixed(2)}<br><span style="font-size:0.9em">${pagado > 0 ? `Pagado: S/ ${pagado.toFixed(2)}` : ''}</span></span>` : '');
+                btn.onclick = () => clickMesa(sub, idPedido, estado, monto, pagado);
+                btn.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    const baseNum = typeof sub === 'string' ? parseInt(sub.match(/^\d+/)[0]) : sub;
+                    mostrarOpcionesMesa(baseNum, true);
+                };
+                cont.appendChild(btn);
             }
+        } else {
+            const mesaPedidos = pedidos[n] || [];
+            let estado = MESA_ESTADOS.LIBRE, monto = 0, pagado = 0, idPedido = null;
+            if (mesaPedidos.length > 0) {
+                const pedidoActivo = mesaPedidos.find(p => (p.monto > p.pagado));
+                if (pedidoActivo) {
+                    estado = pedidoActivo.pagado === 0 ? MESA_ESTADOS.OCUPADA : MESA_ESTADOS.PARCIAL;
+                    monto = pedidoActivo.monto;
+                    pagado = pedidoActivo.pagado;
+                    idPedido = pedidoActivo.id;
+                }
+            }
+            const btn = document.createElement("button");
+            btn.className = 'mesa-btn ' + (estado === MESA_ESTADOS.LIBRE ? 'mesa-libre' : estado === MESA_ESTADOS.OCUPADA ? 'mesa-ocupada' : 'mesa-parcial');
+            btn.innerHTML = `<div class="mesa-num">M${n.toString().padStart(2, '0')}</div>`
+                + (estado !== MESA_ESTADOS.LIBRE ? `<span class="mesa-monto">S/ ${monto.toFixed(2)}<br><span style="font-size:0.9em">${pagado > 0 ? `Pagado: S/ ${pagado.toFixed(2)}` : ''}</span></span>` : '');
+            btn.onclick = () => clickMesa(n, idPedido, estado, monto, pagado);
+            btn.oncontextmenu = (e) => {
+                e.preventDefault();
+                mostrarOpcionesMesa(n, false);
+            };
+            cont.appendChild(btn);
         }
-        const btn = document.createElement('button');
-        btn.className = 'mesa-btn ' + (estado === MESA_ESTADOS.LIBRE ? 'mesa-libre' : estado === MESA_ESTADOS.OCUPADA ? 'mesa-ocupada' : 'mesa-parcial');
-        btn.innerHTML = `<div class="mesa-num">M${n.toString().padStart(2, '0')}</div>`
-            + (estado !== MESA_ESTADOS.LIBRE ? `<span class="mesa-monto">S/ ${monto.toFixed(2)}<br><span style="font-size:0.9em">${pagado > 0 ? `Pagado: S/ ${pagado.toFixed(2)}` : ''}</span></span>` : '');
-        btn.onclick = () => clickMesa(n, idPedido, estado, monto, pagado);
-        grid.appendChild(btn);
     }
+}
+
+// Parte 4: Modal para dividir/unir
+function mostrarOpcionesMesa(num, yaDividida) {
+    let html = `<h3>Mesa ${num}</h3>`;
+    if (yaDividida) {
+        html += `<button class="btn" onclick="unirMesa(${num})">Unir mesas</button>`;
+    } else {
+        html += `<button class="btn" onclick="dividirMesa(${num})">Dividir en 2</button>`;
+    }
+    html += `<button class="btn-cancelar" onclick="closeMesaModal()">Cancelar</button>`;
+    showMesaModal(html);
 }
 
 /* --------- Modal --------- */
@@ -617,18 +689,26 @@ for (const key in catalogo) {
 
 // ---- FUNCIÓN PRINCIPAL ----
 async function clickMesa(num, idPedido, estado, monto, pagado) {
-  if (estado === MESA_ESTADOS.LIBRE) {
-    showMesaModal(`
-      <h3>Nuevo pedido para Mesa ${num}</h3>
-      <p>¿Cómo deseas registrar el pedido?</p>
-      <div style="display:flex; gap:10px; margin-top:12px;">
-        <button class="btn" onclick="mostrarFormularioPorPlato(${num})">🍽️ Por platos</button>
-        <button class="btn" onclick="mostrarFormularioPorMonto(${num})">💰 Solo monto</button>
-      </div>
-      <button onclick="closeMesaModal()" class="btn-cancelar" style="margin-top:18px;">Cancelar</button>
-    `);
-    return;
-  }
+    if (estado === MESA_ESTADOS.LIBRE) {
+        let opcionesExtras = '';
+        const baseNum = parseInt(String(num).match(/^\d+/)?.[0] || num);
+        if (!mesasDivididas[baseNum]) {
+        opcionesExtras = `<button class="btn-secondary" style="margin-top:10px;" onclick="dividirMesa(${baseNum})">➗ Dividir mesa</button>`;
+        } else {
+        opcionesExtras = `<button class="btn-secondary" style="margin-top:10px;" onclick="unirMesa(${baseNum})">🔀 Unir mesas</button>`;
+        }
+        showMesaModal(`
+        <h3>Nuevo pedido para Mesa ${num}</h3>
+        <p>¿Cómo deseas registrar el pedido?</p>
+        <div style="display:flex; gap:10px; margin-top:12px;">
+            <button class="btn" onclick="mostrarFormularioPorPlato('${num}')">🍽️ Por platos</button>
+            <button class="btn" onclick="mostrarFormularioPorMonto('${num}')">💰 Solo monto</button>
+        </div>
+        ${opcionesExtras}
+        <button onclick="closeMesaModal()" class="btn-cancelar" style="margin-top:18px;">Cancelar</button>
+        `);
+        return;
+    }
 
   let pagadoActual = pagado;
   let abonosStr = '';
@@ -661,7 +741,7 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
         <input type="hidden" name="tipo_pago" id="inputTipoPagoMesa" required>
         <button type="submit" class="btn" style="margin-top:12px;">Abonar</button>
       </form>
-      <button class="btn-secondary" style="margin-top:10px;" onclick="anularPedido(${idPedido},${num})">Anular pedido</button>
+      <button class="btn-secondary" style="margin-top:10px;" onclick="anularPedido(${idPedido}, '${num}')">Anular pedido</button>
     `;
   }
 
@@ -674,7 +754,7 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
         Saldo pendiente: S/ ${saldoPendiente.toFixed(2)}
     </div>
     ${botonesExtras}
-    <button class="btn-secondary" style="margin-top:10px;" onclick="agregarPlatosModal(${idPedido},${num})">Agregar platos</button>
+    <button class="btn-secondary" style="margin-top:10px;" onclick="agregarPlatosModal(${idPedido}, '${num}')">Agregar platos</button>
     <button class="btn-secondary" style="margin-top:10px;" onclick="closeMesaModal()">Cerrar</button>
   `);
 
@@ -1041,7 +1121,11 @@ window.agregarPlatosModal = async function(idPedido, num) {
 async function crearPedido(num, monto, detalle = [], observacion = "") {
     if (isNaN(monto) || monto <= 0) return;
     const fecha = new Date().toISOString().split('T')[0];
-    const pedidosActivos = await db.pedidos.where({ fecha, mesa: num }).filter(p => p.estado !== "libre").toArray();
+    const pedidosActivos = await db.pedidos
+        .where("fecha").equals(fecha)
+        .filter(p => p.mesa === num && p.estado !== "libre")
+        .toArray();
+
     if (pedidosActivos.length > 0) {
         showMessage('Ya existe un pedido activo para esta mesa hoy.', 'error');
         return;
@@ -1442,7 +1526,7 @@ window.onload = async function() {
     if (usuarioActual) {
         ocultarLogin();
         initApp();
-        conectarSocket(usuarioActual);    // <---- AGREGADO AQUÍ
+        //conectarSocket(usuarioActual);    // <---- AGREGADO AQUÍ
         if(usuarioActual === "cocina") activarAutoUpdateCocina();
         else if(typeof cocinaInterval !== "undefined" && cocinaInterval) clearInterval(cocinaInterval);
     } else {
