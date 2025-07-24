@@ -145,8 +145,41 @@ font-weight: bold;
 transition: all 0.3s ease;
 }
 .btn-secondary:hover {
-transform: translateY(-2px);
-box-shadow: 0 8px 20px rgba(231, 76, 60, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(231, 76, 60, 0.4);
+}
+
+/* Botón de gráfica */
+.btn-grafica {
+    background: linear-gradient(135deg, #8e44ad, #9b59b6);
+    color: #fff;
+    padding: 12px 25px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    width: 100%;
+    grid-column: 1 / -1;
+    transition: all 0.3s ease;
+    margin-top: 5px;
+}
+.btn-grafica:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(142, 68, 173, 0.4);
+}
+
+/* Lienzo de la gráfica */
+#graficaPlatos {
+    display: none;
+    max-width: 700px;
+    width: 100%;
+    margin: 20px auto;
+    background: #fff;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    box-sizing: border-box;
 }
 /* Resumen de pedidos pagados */
 .resumen-pedidos {

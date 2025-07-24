@@ -119,8 +119,10 @@
             <input id="fechaFin" type="date" />
         </div>
         <button class="btn-secondary" id="btnGenerarReporte">Generar Reporte</button>
+        <button class="btn-grafica" id="btnGenerarGrafica">Gráfica Platos</button>
     </div>
     <div id="tablaReporte"></div>
+    <canvas id="graficaPlatos"></canvas>
 </div>
 <div class="db-actions solo-caja">
     <button class="btn-database" id="btnExportarBD">Exportar BD</button>
@@ -189,6 +191,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>-->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="app.js?v=1.0.4"></script>
 </body>
 </html>
