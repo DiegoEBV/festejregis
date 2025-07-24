@@ -600,18 +600,8 @@ window.abrirPagoPedidoEspecial = function(idPedido, tipoPedido) {
             <button type="button" onclick="closeMesaModal()" class="btn-secondary" style="margin-top:12px;">Cancelar</button>
         </form>
     `);
-    // JS para seleccionar botón
-    const pagoBotones = document.querySelectorAll("#pagoBotones .btn-medio");
-    const inputTipoPago = document.getElementById("inputTipoPagoEspecial");
-    pagoBotones.forEach(btn => {
-        btn.onclick = function() {
-            pagoBotones.forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-            inputTipoPago.value = btn.getAttribute('data-pago');
-        };
-    });
-    // Preselecciona "efectivo"
-    pagoBotones[0].click();
+    const inputTipoPago = document.getElementById('inputTipoPagoEspecial');
+    setupPagoButtons('pagoBotones', 'inputTipoPagoEspecial');
 
     document.getElementById('pagoPedidoEspecialForm').onsubmit = function(e) {
         e.preventDefault();
@@ -687,6 +677,44 @@ for (const key in catalogo) {
     }
 }
 
+function setupAutocomplete(inputId, listId, onSelect) {
+    const inputEl = document.getElementById(inputId);
+    const listEl = document.getElementById(listId);
+    inputEl.oninput = () => {
+        const val = inputEl.value.trim().toLowerCase();
+        listEl.innerHTML = '';
+        listEl.style.display = 'none';
+        if (!val) return;
+        const sugerencias = catalogoArray.filter(p => p.nombre.toLowerCase().includes(val));
+        sugerencias.forEach(prod => {
+            const div = document.createElement('div');
+            div.textContent = `${prod.nombre} (S/ ${prod.precio.toFixed(2)})`;
+            div.onclick = () => {
+                inputEl.value = prod.nombre;
+                onSelect && onSelect(prod);
+                listEl.innerHTML = '';
+                listEl.style.display = 'none';
+            };
+            listEl.appendChild(div);
+        });
+        if (sugerencias.length) listEl.style.display = 'block';
+    };
+    inputEl.onblur = () => setTimeout(() => { listEl.style.display = 'none'; }, 150);
+}
+
+function setupPagoButtons(containerId, inputId) {
+    const buttons = document.querySelectorAll(`#${containerId} .btn-medio`);
+    const input = document.getElementById(inputId);
+    buttons.forEach(btn => {
+        btn.onclick = () => {
+            buttons.forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            input.value = btn.getAttribute('data-pago');
+        };
+    });
+    if (buttons[0]) buttons[0].click();
+}
+
 // ---- FUNCIÓN PRINCIPAL ----
 async function clickMesa(num, idPedido, estado, monto, pagado) {
     if (estado === MESA_ESTADOS.LIBRE) {
@@ -759,16 +787,8 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
   `);
 
   if (usuarioActual === 'caja' && document.getElementById('abonoForm')) {
-    const pagoBotones = document.querySelectorAll("#pagoBotones .btn-medio");
-    const inputTipoPago = document.getElementById("inputTipoPagoMesa");
-    pagoBotones.forEach(btn => {
-      btn.onclick = function() {
-        pagoBotones.forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
-        inputTipoPago.value = btn.getAttribute('data-pago');
-      };
-    });
-    pagoBotones[0].click();
+    const inputTipoPago = document.getElementById('inputTipoPagoMesa');
+    setupPagoButtons('pagoBotones', 'inputTipoPagoMesa');
 
     document.querySelector('#abonoForm input[name="abono"]').addEventListener('input', function() {
       let val = parseFloat(this.value) || 0;
@@ -890,34 +910,8 @@ function mostrarFormularioPorPlato(num) {
   showMesaModal(htmlForm);
 
   // ------- AUTOCOMPLETADO ---------
-  const productoInput = document.getElementById('productoInput');
-  const autocompleteList = document.getElementById('autocompleteList');
   let productoSeleccionado = null;
-
-  productoInput.oninput = function () {
-    let val = this.value.trim().toLowerCase();
-    autocompleteList.innerHTML = '';
-    autocompleteList.style.display = 'none';
-    if (!val) return;
-    const sugerencias = catalogoArray.filter(p => p.nombre.toLowerCase().includes(val));
-    sugerencias.forEach(prod => {
-      let div = document.createElement('div');
-      div.textContent = prod.nombre + " (S/ " + prod.precio.toFixed(2) + ")";
-      div.onclick = function () {
-        productoInput.value = prod.nombre;
-        productoSeleccionado = prod;
-        autocompleteList.innerHTML = '';
-        autocompleteList.style.display = 'none';
-      };
-      autocompleteList.appendChild(div);
-    });
-    if (sugerencias.length) {
-      autocompleteList.style.display = 'block';
-    }
-  };
-  productoInput.onblur = function () {
-    setTimeout(() => autocompleteList.style.display = 'none', 150);
-  };
+  setupAutocomplete('productoInput', 'autocompleteList', prod => productoSeleccionado = prod);
 
   // -------- AGREGAR PRODUCTO AL PEDIDO ---------
   document.getElementById('agregarBtn').onclick = function () {
@@ -1028,33 +1022,8 @@ window.agregarPlatosModal = async function(idPedido, num) {
     showMesaModal(htmlForm);
 
     // ------- AUTOCOMPLETADO CORRECTO ---------
-    const productoInputAgregar = document.getElementById('productoInputAgregar');
-    const autocompleteListAgregar = document.getElementById('autocompleteListAgregar');
     let productoSeleccionadoAgregar = null;
-
-    productoInputAgregar.oninput = function () {
-        let val = this.value.trim().toLowerCase();
-        autocompleteListAgregar.innerHTML = '';
-        autocompleteListAgregar.style.display = 'none';
-        if (!val) return;
-        const sugerencias = catalogoArray.filter(p => p.nombre.toLowerCase().includes(val));
-        sugerencias.forEach(prod => {
-            let div = document.createElement('div');
-            div.textContent = prod.nombre + " (S/ " + prod.precio.toFixed(2) + ")";
-            div.onclick = function () {
-                productoInputAgregar.value = prod.nombre;
-                productoSeleccionadoAgregar = prod;
-                autocompleteListAgregar.innerHTML = '';
-                autocompleteListAgregar.style.display = 'none';
-            };
-            autocompleteListAgregar.appendChild(div);
-        });
-        if (sugerencias.length) {
-            autocompleteListAgregar.style.display = 'block';
-        }
-    };
-    // Oculta cuando pierdes foco
-    productoInputAgregar.onblur = function () { setTimeout(() => autocompleteListAgregar.style.display = 'none', 150); };
+    setupAutocomplete('productoInputAgregar', 'autocompleteListAgregar', prod => productoSeleccionadoAgregar = prod);
 
     // -------- AGREGAR PRODUCTO AL PEDIDO ---------
     document.getElementById('agregarBtnAgregar').onclick = function() {
