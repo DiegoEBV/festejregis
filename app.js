@@ -1432,6 +1432,59 @@ document.getElementById('btnGenerarReporte').onclick = async function() {
     document.getElementById('tablaReporte').innerHTML = html;
 };
 
+// ----- Gráfica de platos más consumidos -----
+let graficaPlatosChart = null;
+document.getElementById('btnGenerarGrafica').onclick = async function() {
+    const inicio = document.getElementById('fechaInicio').value;
+    const fin = document.getElementById('fechaFin').value;
+    if (!inicio || !fin) {
+        showMessage('Debe seleccionar ambas fechas', 'error');
+        return;
+    }
+    const rows = await db.pedidos
+        .where('fecha').between(inicio, fin, true, true)
+        .toArray();
+    const conteo = {};
+    for (const row of rows) {
+        if (Array.isArray(row.detalle)) {
+            row.detalle.forEach(p => {
+                const nombre = p.nombre;
+                const cant = Number(p.cantidad) || 1;
+                conteo[nombre] = (conteo[nombre] || 0) + cant;
+            });
+        }
+    }
+    const items = Object.entries(conteo)
+        .sort((a,b) => b[1]-a[1])
+        .slice(0, 10);
+    if (!items.length) {
+        showMessage('No hay datos para ese rango', 'error');
+        return;
+    }
+    const labels = items.map(i => i[0]);
+    const data = items.map(i => i[1]);
+    const ctx = document.getElementById('graficaPlatos').getContext('2d');
+    if (graficaPlatosChart) graficaPlatosChart.destroy();
+    graficaPlatosChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Platos vendidos',
+                data: data,
+                backgroundColor: 'rgba(54, 162, 235, 0.6)'
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+    document.getElementById('graficaPlatos').style.display = 'block';
+};
+
 
 /* --------- Exportar/Importar/Limpiar BD --------- */
 document.getElementById('btnExportarBD').onclick = async function() {
