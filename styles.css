@@ -918,6 +918,21 @@ max-width: unset;
     font-size: 1.13em;
     padding: 12px 0;
 }
+
+/* ----- Dark mode ----- */
+body.dark-mode {
+    background: #222;
+    color: #eee;
+}
+body.dark-mode .container { background: rgba(34,34,34,0.95); }
+body.dark-mode .header { background: linear-gradient(135deg,#555,#333); }
+body.dark-mode table th { background:#444; }
+body.dark-mode table td { color:#eee; }
+body.dark-mode .form-section,
+body.dark-mode .resumen-pagados-section,
+body.dark-mode .reports-section,
+body.dark-mode .db-actions,
+body.dark-mode #catalogAdmin { background:#333;color:#eee; }
 th, td {
     padding: 8px 4px;
     font-size: 0.92em;
