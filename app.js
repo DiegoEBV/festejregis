@@ -8,6 +8,17 @@ const USUARIOS = {
 let usuarioActual = null;        // "caja" o "moso"
 let nombreMosoActual = null;     // nombre/alias del moso actual
 
+// ----- Modo oscuro -----
+const darkBtn = document.getElementById('toggleDarkMode');
+if (darkBtn) {
+  const pref = localStorage.getItem('darkMode');
+  if (pref === '1') document.body.classList.add('dark-mode');
+  darkBtn.onclick = () => {
+    const active = document.body.classList.toggle('dark-mode');
+    localStorage.setItem('darkMode', active ? '1' : '0');
+  };
+}
+
 // Mostrar/ocultar campo nombre moso según selección
 const usuarioSelect = document.getElementById('usuario');
 const nombreMosoBox = document.getElementById('nombreMosoBox');
@@ -95,6 +106,8 @@ function configurarUIporUsuario() {
 
   // Elementos solo para caja
   document.querySelectorAll('.solo-caja').forEach(el => el.style.display = esCaja ? '' : 'none');
+  const catalogAdmin = document.getElementById('catalogAdmin');
+  if (catalogAdmin) catalogAdmin.style.display = esCaja ? '' : 'none';
   // Pedidos especiales (solo caja)
   document.querySelectorAll('.pedido-especial-box').forEach(el => el.style.display = esCaja ? '' : 'none');
   // Solo mosos (si tienes)
@@ -110,6 +123,7 @@ function configurarUIporUsuario() {
     renderComandasCocina();
     activarAutoUpdateCocina && activarAutoUpdateCocina();
   }
+  if (esCaja) renderCatalogoAdmin();
 }
 let socket = null;
 
@@ -667,14 +681,25 @@ window.pagarPedidoEspecial = async function(idPedido, tipoPedido, tipo_pago) {
 
 /* -------- MESAS CRUD ---------- */
 // ---- FLATTEN del catálogo agrupado ----
-const catalogoArray = [];
-let _id = 1;
-for (const key in catalogo) {
+let catalogoArray = JSON.parse(localStorage.getItem('catalogoCustom') || 'null');
+let catalogoNextId = 1;
+if (!catalogoArray) {
+  catalogoArray = [];
+  let _id = 1;
+  for (const key in catalogo) {
     if (Array.isArray(catalogo[key])) {
-        catalogo[key].forEach(prod => catalogoArray.push({ ...prod, id: _id++, categoria: key }));
+      catalogo[key].forEach(prod => catalogoArray.push({ ...prod, id: _id++, categoria: key }));
     } else if (typeof catalogo[key] === 'object') {
-        catalogoArray.push({ ...catalogo[key], id: _id++, categoria: key });
+      catalogoArray.push({ ...catalogo[key], id: _id++, categoria: key });
     }
+  }
+  catalogoNextId = _id;
+} else {
+  catalogoNextId = catalogoArray.reduce((m,p)=>Math.max(m,p.id),0) + 1;
+}
+
+function guardarCatalogo() {
+  localStorage.setItem('catalogoCustom', JSON.stringify(catalogoArray));
 }
 
 function setupAutocomplete(inputId, listId, onSelect) {
@@ -740,11 +765,12 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
 
   let pagadoActual = pagado;
   let abonosStr = '';
+  let pedidoObj = null;
   if (idPedido) {
-    const pedido = await db.pedidos.get(idPedido);
-    if (pedido && pedido.abonos && Array.isArray(pedido.abonos) && pedido.abonos.length) {
-      pagadoActual = pedido.abonos.reduce((sum, a) => sum + Number(a.monto), 0);
-      abonosStr = pedido.abonos.map(a =>
+    pedidoObj = await db.pedidos.get(idPedido);
+    if (pedidoObj && pedidoObj.abonos && Array.isArray(pedidoObj.abonos) && pedidoObj.abonos.length) {
+      pagadoActual = pedidoObj.abonos.reduce((sum, a) => sum + Number(a.monto), 0);
+      abonosStr = pedidoObj.abonos.map(a =>
         `<div style="font-size:0.97em; color:#444; margin-bottom:2px;">
           ${a.tipo_pago.charAt(0).toUpperCase()+a.tipo_pago.slice(1)}: S/ ${Number(a.monto).toFixed(2)}
         </div>`
@@ -782,7 +808,7 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
         Saldo pendiente: S/ ${saldoPendiente.toFixed(2)}
     </div>
     ${botonesExtras}
-    <button class="btn-secondary" style="margin-top:10px;" onclick="agregarPlatosModal(${idPedido}, '${num}')">Agregar platos</button>
+    ${ (usuarioActual === 'moso' && pedidoObj && pedidoObj.enviado_cocina) ? '' : `<button class="btn-secondary" style="margin-top:10px;" onclick="editarPedidoModal(${idPedido}, '${num}')">${usuarioActual === 'moso' ? 'Editar pedido' : 'Agregar platos'}</button>`}
     <button class="btn-secondary" style="margin-top:10px;" onclick="closeMesaModal()">Cerrar</button>
   `);
 
@@ -973,13 +999,13 @@ function mostrarFormularioPorPlato(num) {
 
 
 
-window.agregarPlatosModal = async function(idPedido, num) {
+window.editarPedidoModal = async function(idPedido, num) {
     const pedido = await db.pedidos.get(idPedido);
     if (!pedido) { showMessage('Pedido no encontrado', 'error'); return; }
     let pedidoDetalle = pedido.detalle ? [...pedido.detalle] : [];
 
     let htmlForm = `
-        <h3>Agregar platos a Mesa ${num}</h3>
+        <h3>Editar pedido Mesa ${num}</h3>
         <form id="agregarPlatosForm" autocomplete="off" style="margin:0">
             <div class="pedido-row">
                 <div class="pedido-col producto">
@@ -1055,7 +1081,7 @@ window.agregarPlatosModal = async function(idPedido, num) {
             let tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${prod.nombre}</td>
-                <td>${prod.cantidad}</td>
+                <td><input type="number" class="cant-edit" data-idx="${idx}" value="${prod.cantidad}" min="1" style="width:60px"></td>
                 <td>S/ ${prod.precio.toFixed(2)}</td>
                 <td>S/ ${sub.toFixed(2)}</td>
                 <td>
@@ -1063,6 +1089,14 @@ window.agregarPlatosModal = async function(idPedido, num) {
                 </td>
             `;
             tbody.appendChild(tr);
+        });
+        tbody.querySelectorAll('.cant-edit').forEach(inp=>{
+            inp.onchange = e => {
+                const i = parseInt(e.target.dataset.idx);
+                let val = parseInt(e.target.value) || 1;
+                pedidoDetalle[i].cantidad = val;
+                renderTablaPedidoAgregar();
+            };
         });
         document.getElementById('pedidoTotalAgregar').innerText = "S/ " + total.toFixed(2);
     }
@@ -1077,11 +1111,16 @@ window.agregarPlatosModal = async function(idPedido, num) {
             showMessage("Debe agregar al menos un producto.", "error");
             return;
         }
-        await db.pedidos.update(idPedido, { detalle: detalle, monto: total });
+        await db.pedidos.update(idPedido, {
+            detalle: detalle,
+            monto: total,
+            ultima_edicion_por: usuarioActual === 'moso' ? nombreMosoActual : usuarioActual,
+            ultima_edicion_ts: new Date().toISOString()
+        });
         await renderMesas();
         await updateStats();
         await updateResumenPagadosTable();
-        showMessage('Platos agregados correctamente.');
+        showMessage('Pedido actualizado correctamente.');
         closeMesaModal();
     };
 };
@@ -1534,6 +1573,59 @@ document.getElementById('btnLimpiarBD').onclick = async function() {
     showMessage('Base de datos limpiada');
 };
 window.addEventListener('offline', () => alert('Estás sin conexión, pero puedes seguir trabajando. Los datos se guardan en el dispositivo.'));
+
+// ----- Panel de catálogo -----
+function renderCatalogoAdmin() {
+  const tbody = document.getElementById('catalogoBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  catalogoArray.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" class="cat-nombre" data-id="${item.id}" value="${item.nombre}"></td>
+      <td><input type="number" step="0.01" class="cat-precio" data-id="${item.id}" value="${item.precio}"></td>
+      <td><button class="btn-secondary btn-sm" data-id="${item.id}">🗑️</button></td>`;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('.cat-nombre').forEach(inp => {
+    inp.onchange = e => {
+      const id = parseInt(e.target.dataset.id);
+      const prod = catalogoArray.find(p=>p.id===id);
+      if (prod) prod.nombre = e.target.value.trim();
+      guardarCatalogo();
+    };
+  });
+  tbody.querySelectorAll('.cat-precio').forEach(inp => {
+    inp.onchange = e => {
+      const id = parseInt(e.target.dataset.id);
+      const prod = catalogoArray.find(p=>p.id===id);
+      if (prod) prod.precio = parseFloat(e.target.value) || 0;
+      guardarCatalogo();
+    };
+  });
+  tbody.querySelectorAll('button').forEach(btn => {
+    btn.onclick = () => {
+      const id = parseInt(btn.dataset.id);
+      catalogoArray = catalogoArray.filter(p=>p.id!==id);
+      guardarCatalogo();
+      renderCatalogoAdmin();
+    };
+  });
+}
+
+if (document.getElementById('formNuevoProd')) {
+  document.getElementById('formNuevoProd').onsubmit = e => {
+    e.preventDefault();
+    const nombre = document.getElementById('nuevoNombre').value.trim();
+    const precio = parseFloat(document.getElementById('nuevoPrecio').value);
+    if (!nombre || isNaN(precio)) return;
+    catalogoArray.push({id: catalogoNextId++, nombre, precio, categoria:'custom'});
+    document.getElementById('nuevoNombre').value='';
+    document.getElementById('nuevoPrecio').value='';
+    guardarCatalogo();
+    renderCatalogoAdmin();
+  };
+}
 
 window.onload = async function() {
     document.getElementById('nombreMosoBox').style.display = 'none';
