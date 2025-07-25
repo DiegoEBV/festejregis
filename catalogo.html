@@ -9,10 +9,19 @@
   <link rel="stylesheet" href="styles.css?v=1.0.4">
 </head>
 <body>
+<button id="menuButton" class="menu-button">☰</button>
+<nav id="sideMenu" class="side-menu">
+  <ul>
+    <li><a href="index.html">Inicio</a></li>
+    <li><a href="catalogo.html">Catálogo</a></li>
+    <li><a href="historial.html">Historial</a></li>
+    <li><a href="productividad.html">Productividad</a></li>
+  </ul>
+</nav>
 <div class="container">
   <div class="header">
     <h1>📋 Administrar catálogo</h1>
-    <button id="toggleDarkMode" title="Modo oscuro" style="position:fixed;top:16px;left:10px;z-index:8500;" class="btn-secondary">🌙</button>
+    <button id="toggleDarkMode" title="Modo oscuro" style="position:fixed;top:16px;left:50px;z-index:8500;" class="btn-secondary">🌙</button>
     <a href="index.html" class="btn-secondary" style="position:fixed;top:16px;right:10px;z-index:8500;">Volver</a>
   </div>
   <div id="catalogAdmin" style="margin-top:30px;">
@@ -27,6 +36,7 @@
     </table>
   </div>
 </div>
+<script src="menu.js"></script>
 <script src="catalog-admin.js?v=1.0.0"></script>
 </body>
 </html>
