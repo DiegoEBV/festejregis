@@ -127,6 +127,41 @@ function configurarUIporUsuario() {
 }
 let socket = null;
 
+const DEFAULT_ZONE_COLORS = {
+  terraza: '#e0ffe0',
+  salon: '#e0eaff',
+  barra: '#ffe0e0'
+};
+let zoneColors = { ...DEFAULT_ZONE_COLORS };
+
+function aplicarColoresZonas() {
+  const r = document.documentElement;
+  r.style.setProperty('--color-terraza', zoneColors.terraza);
+  r.style.setProperty('--color-salon', zoneColors.salon);
+  r.style.setProperty('--color-barra', zoneColors.barra);
+}
+
+function cargarColoresZonas() {
+  const stored = localStorage.getItem('zoneColors');
+  if (stored) {
+    try { zoneColors = JSON.parse(stored); } catch(e){}
+  }
+  ['terraza','salon','barra'].forEach(z => {
+    const input = document.getElementById('color'+z.charAt(0).toUpperCase()+z.slice(1));
+    if (input) input.value = zoneColors[z];
+  });
+  aplicarColoresZonas();
+}
+
+function guardarColoresZonas() {
+  zoneColors.terraza = document.getElementById('colorTerraza').value;
+  zoneColors.salon = document.getElementById('colorSalon').value;
+  zoneColors.barra = document.getElementById('colorBarra').value;
+  localStorage.setItem('zoneColors', JSON.stringify(zoneColors));
+  aplicarColoresZonas();
+  renderMesas();
+}
+
 /*function conectarSocket(rol) {
     socket = io("http://localhost:4000"); // Cambia a tu IP/LAN si es necesario
     socket.emit("identificarse", rol);
@@ -208,10 +243,17 @@ db.version(3).stores({
 const TOTAL_MESAS = 27;
 const MESA_ESTADOS = { LIBRE: 'libre', OCUPADA: 'ocupada', PARCIAL: 'parcial' };
 
+function zonaDeMesa(num) {
+  if (num <= 9) return 'terraza';
+  if (num <= 18) return 'salon';
+  return 'barra';
+}
+
 async function initApp() {
     document.getElementById('loadingMessage').style.display = 'none';
     document.getElementById('mainApp').style.display = 'block';
     setupEventListeners();
+    cargarColoresZonas();
     setCurrentDate();
     await renderMesas();
     await updateStats();
@@ -305,7 +347,8 @@ async function renderMesas() {
                     }
                 }
                 const btn = document.createElement("button");
-                btn.className = 'mesa-btn ' + (estado === MESA_ESTADOS.LIBRE ? 'mesa-libre mesa-dividida' : estado === MESA_ESTADOS.OCUPADA ? 'mesa-ocupada mesa-dividida' : 'mesa-parcial mesa-dividida');
+                const zona = zonaDeMesa(typeof sub === 'string' ? parseInt(sub.match(/^\d+/)[0]) : sub);
+                btn.className = 'mesa-btn mesa-zona-' + zona + ' ' + (estado === MESA_ESTADOS.LIBRE ? 'mesa-libre mesa-dividida' : estado === MESA_ESTADOS.OCUPADA ? 'mesa-ocupada mesa-dividida' : 'mesa-parcial mesa-dividida');
                 btn.innerHTML = `<div class="mesa-num">M${sub}</div>`
                     + (estado !== MESA_ESTADOS.LIBRE ? `<span class="mesa-monto">S/ ${monto.toFixed(2)}<br><span style="font-size:0.9em">${pagado > 0 ? `Pagado: S/ ${pagado.toFixed(2)}` : ''}</span></span>` : '');
                 btn.onclick = () => clickMesa(sub, idPedido, estado, monto, pagado);
@@ -329,7 +372,8 @@ async function renderMesas() {
                 }
             }
             const btn = document.createElement("button");
-            btn.className = 'mesa-btn ' + (estado === MESA_ESTADOS.LIBRE ? 'mesa-libre' : estado === MESA_ESTADOS.OCUPADA ? 'mesa-ocupada' : 'mesa-parcial');
+            const zona = zonaDeMesa(n);
+            btn.className = 'mesa-btn mesa-zona-' + zona + ' ' + (estado === MESA_ESTADOS.LIBRE ? 'mesa-libre' : estado === MESA_ESTADOS.OCUPADA ? 'mesa-ocupada' : 'mesa-parcial');
             btn.innerHTML = `<div class="mesa-num">M${n.toString().padStart(2, '0')}</div>`
                 + (estado !== MESA_ESTADOS.LIBRE ? `<span class="mesa-monto">S/ ${monto.toFixed(2)}<br><span style="font-size:0.9em">${pagado > 0 ? `Pagado: S/ ${pagado.toFixed(2)}` : ''}</span></span>` : '');
             btn.onclick = () => clickMesa(n, idPedido, estado, monto, pagado);
@@ -1416,6 +1460,8 @@ async function setCajaApertura() {
 }
 function setupEventListeners() {
     document.getElementById('btnCajaApertura').addEventListener('click', setCajaApertura);
+    const btnColor = document.getElementById('guardarColoresZona');
+    if (btnColor) btnColor.addEventListener('click', guardarColoresZonas);
 }
 document.getElementById('btnGenerarReporte').onclick = async function() {
     const inicio = document.getElementById('fechaInicio').value;
@@ -1641,6 +1687,7 @@ if (document.getElementById('formNuevoProd')) {
 
 window.onload = async function() {
     document.getElementById('nombreMosoBox').style.display = 'none';
+    cargarColoresZonas();
     const today = (new Date()).toISOString().slice(0, 10);
     document.getElementById('fechaInicio').value = today;
     document.getElementById('fechaFin').value = today;
