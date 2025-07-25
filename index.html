@@ -11,10 +11,19 @@
     <link rel="stylesheet" href="styles.css?v=1.0.4">
 </head>
 <body>
+<button id="menuButton" class="menu-button">☰</button>
+<nav id="sideMenu" class="side-menu">
+  <ul>
+    <li><a href="index.html">Inicio</a></li>
+    <li><a href="catalogo.html">Catálogo</a></li>
+    <li><a href="historial.html">Historial</a></li>
+    <li><a href="productividad.html">Productividad</a></li>
+  </ul>
+</nav>
 <div class="container">
     <div class="header">
         <h1>🍽️ Sistema de Registro Pedidos - FESTEJOS</h1>
-        <button id="toggleDarkMode" title="Modo oscuro" style="position:fixed;top:16px;left:10px;z-index:8500;" class="btn-secondary">🌙</button>
+        <button id="toggleDarkMode" title="Modo oscuro" style="position:fixed;top:16px;left:50px;z-index:8500;" class="btn-secondary">🌙</button>
         <div class="date-info">
             <span id="currentDate"></span>
         </div>
@@ -196,6 +205,7 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="menu.js"></script>
 <script src="app.js?v=1.0.4"></script>
 </body>
 </html>

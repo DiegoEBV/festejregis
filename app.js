@@ -281,7 +281,9 @@ async function renderMesas() {
     cont.innerHTML = "";
 
     const today = new Date().toISOString().split('T')[0];
-    let pedidosArr = await db.pedidos.where("fecha").equals(today).toArray();
+    let pedidosArr = await db.pedidos.where("fecha").equals(today)
+        .filter(p => p.estado !== 'anulado')
+        .toArray();
     let pedidos = {};
     pedidosArr.forEach(p => {
         if (!pedidos[p.mesa]) pedidos[p.mesa] = [];
@@ -370,7 +372,7 @@ async function renderComandasCocina() {
     // Solo muestra pedidos NO libres y NO listos
     const pedidos = await db.pedidos
       .where("fecha").equals(today)
-      .filter(p => p.estado !== "libre" && p.estado !== "listo")
+      .filter(p => p.estado !== "libre" && p.estado !== "listo" && p.estado !== "anulado")
       .toArray();
 
     if (!pedidos.length) {
@@ -443,7 +445,7 @@ setInterval(async () => {
     const today = new Date().toISOString().split('T')[0];
     const pedidos = await db.pedidos
         .where("fecha").equals(today)
-        .filter(p => p.estado !== "libre" && p.estado !== "listo")
+        .filter(p => p.estado !== "libre" && p.estado !== "listo" && p.estado !== "anulado")
         .toArray();
 
     pedidos.forEach(p => {
@@ -516,7 +518,9 @@ function cerrarAlertaPedidoListo() {
 async function revisarPedidosListosParaMoso() {
   if (usuarioActual !== "moso") return;
   const today = new Date().toISOString().split('T')[0];
-  const pedidos = await db.pedidos.where({ fecha: today, creado_por: nombreMosoActual }).toArray();
+  const pedidos = await db.pedidos.where({ fecha: today, creado_por: nombreMosoActual })
+    .filter(p => p.estado !== 'anulado')
+    .toArray();
   pedidos.forEach(ped => {
     if(ped.detalle) {
       ped.detalle.forEach(plato => {
@@ -1131,7 +1135,7 @@ async function crearPedido(num, monto, detalle = [], observacion = "") {
     const fecha = new Date().toISOString().split('T')[0];
     const pedidosActivos = await db.pedidos
         .where("fecha").equals(fecha)
-        .filter(p => p.mesa === num && p.estado !== "libre")
+        .filter(p => p.mesa === num && p.estado !== "libre" && p.estado !== "anulado")
         .toArray();
 
     if (pedidosActivos.length > 0) {
@@ -1195,7 +1199,10 @@ async function abonarPedido(idPedido, abono, tipo_pago, monto, pagado, num) {
 
 window.anularPedido = async function(idPedido, num) {
     if (confirm(`¿Anular pedido de Mesa ${num}? Esta acción no se puede deshacer.`)) {
-        await db.pedidos.delete(idPedido);
+        await db.pedidos.update(idPedido, {
+            estado: 'anulado',
+            fecha_anulado: new Date().toISOString()
+        });
         await renderMesas();
         await updateStats();
         await updateResumenPagadosTable();
@@ -1208,7 +1215,9 @@ window.anularPedido = async function(idPedido, num) {
 async function updateResumenPagadosTable() {
     const cont = document.getElementById('resumenPagadosTable');
     const today = new Date().toISOString().split('T')[0];
-    const rows = await db.pedidos.where("fecha").equals(today).filter(p => (p.pagado || 0) > 0).toArray();
+    const rows = await db.pedidos.where("fecha").equals(today)
+        .filter(p => (p.pagado || 0) > 0 && p.estado !== 'anulado')
+        .toArray();
     if (!rows.length) {
         cont.innerHTML = '<div style="color:#666;padding:15px;">No hay pedidos pagados aún.</div>';
         return;
@@ -1363,7 +1372,9 @@ window.imprimirDetalleAbonos = async function(idPedido) {
 async function updateStats() {
     const today = new Date().toISOString().split('T')[0];
     const paymentTotals = { efectivo: 0, yape: 0, tarjeta: 0 };
-    const rows = await db.pedidos.where("fecha").equals(today).toArray();
+    const rows = await db.pedidos.where("fecha").equals(today)
+        .filter(p => p.estado !== 'anulado')
+        .toArray();
     for (const row of rows) {
         if (row.abonos && Array.isArray(row.abonos)) {
             row.abonos.forEach(ab => {
@@ -1419,7 +1430,7 @@ document.getElementById('btnGenerarReporte').onclick = async function() {
 
     const rows = await db.pedidos
         .where("fecha").between(inicio, fin, true, true)
-        .filter(p => p.pagado >= p.monto).toArray();
+        .filter(p => p.pagado >= p.monto && p.estado !== 'anulado').toArray();
 
     // Recalcular totales
     const paymentTotals = { efectivo: 0, yape: 0, tarjeta: 0 };
@@ -1482,6 +1493,7 @@ document.getElementById('btnGenerarGrafica').onclick = async function() {
     }
     const rows = await db.pedidos
         .where('fecha').between(inicio, fin, true, true)
+        .filter(p => p.estado !== 'anulado')
         .toArray();
     const conteo = {};
     for (const row of rows) {
