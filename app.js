@@ -812,6 +812,7 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
         Saldo pendiente: S/ ${saldoPendiente.toFixed(2)}
     </div>
     ${botonesExtras}
+    <button class="btn-secondary" style="margin-top:10px;" onclick="mostrarPrecuenta(${idPedido})">Solicitar Precuenta</button>
     ${ (usuarioActual === 'moso' && pedidoObj && pedidoObj.enviado_cocina) ? '' : `<button class="btn-secondary" style="margin-top:10px;" onclick="editarPedidoModal(${idPedido}, '${num}')">${usuarioActual === 'moso' ? 'Editar pedido' : 'Agregar platos'}</button>`}
     <button class="btn-secondary" style="margin-top:10px;" onclick="closeMesaModal()">Cerrar</button>
   `);
@@ -1362,6 +1363,61 @@ window.imprimirDetalleAbonos = async function(idPedido) {
     let w = window.open('', '_blank', 'width=550,height=900');
     w.document.write(`
         <html><head><title>Detalle de Pedido</title></head><body>${html}
+        <br><button onclick="window.print();">Imprimir</button>
+        </body></html>
+    `);
+    w.document.close();
+};
+
+window.mostrarPrecuenta = async function(idPedido) {
+    const pedido = await db.pedidos.get(idPedido);
+    if (!pedido) return alert('Pedido no encontrado');
+    let nombre = pedido.nombre || '-';
+    let mesa = pedido.mesa === 0
+        ? (pedido.tipo_pedido === "para llevar" ? "Para Llevar"
+            : pedido.tipo_pedido === "delivery" ? "Delivery" : "Especial")
+        : "M" + pedido.mesa.toString().padStart(2, '0');
+
+    let productosHTML = `
+        <table border="1" cellpadding="7" cellspacing="0" style="width:100%;margin-top:8px;font-size:1em;">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>P. Unitario</th>
+                    <th>Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${(pedido.detalle || []).map((prod, i) => `
+                    <tr>
+                        <td style="text-align:center">${i + 1}</td>
+                        <td>${prod.nombre}</td>
+                        <td style="text-align:center">${prod.cantidad}</td>
+                        <td>S/ ${Number(prod.precio).toFixed(2)}</td>
+                        <td>S/ ${(prod.precio * prod.cantidad).toFixed(2)}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+
+    let html = `
+    <div style="font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;min-width:350px;">
+        <h2 style="text-align:center;margin-bottom:12px;">Precuenta</h2>
+        <b>Mesa/Pedido:</b> ${mesa} <br>
+        <b>Nombre:</b> ${nombre} <br>
+        ${productosHTML}
+        <div style="margin:13px 0 7px 0;">
+            <b>Total:</b> S/ ${Number(pedido.monto).toFixed(2)}
+        </div>
+    </div>
+    `;
+
+    let w = window.open('', '_blank', 'width=550,height=900');
+    w.document.write(`
+        <html><head><title>Precuenta</title></head><body>${html}
         <br><button onclick="window.print();">Imprimir</button>
         </body></html>
     `);
