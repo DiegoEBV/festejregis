@@ -11,9 +11,19 @@
     <link rel="stylesheet" href="styles.css?v=1.0.4">
 </head>
 <body>
+<button id="menuButton" class="menu-button">☰</button>
+<nav id="sideMenu" class="side-menu">
+  <ul>
+    <li><a href="index.html">Inicio</a></li>
+    <li><a href="catalogo.html">Catálogo</a></li>
+    <li><a href="historial.html">Historial</a></li>
+    <li><a href="productividad.html">Productividad</a></li>
+  </ul>
+</nav>
 <div class="container">
     <div class="header">
         <h1>🍽️ Sistema de Registro Pedidos - FESTEJOS</h1>
+        <button id="toggleDarkMode" title="Modo oscuro" style="position:fixed;top:16px;left:50px;z-index:8500;" class="btn-secondary">🌙</button>
         <div class="date-info">
             <span id="currentDate"></span>
         </div>
@@ -119,14 +129,19 @@
             <input id="fechaFin" type="date" />
         </div>
         <button class="btn-secondary" id="btnGenerarReporte">Generar Reporte</button>
+        <button class="btn-grafica" id="btnGenerarGrafica">Gráfica Platos</button>
     </div>
     <div id="tablaReporte"></div>
+    <canvas id="graficaPlatos"></canvas>
 </div>
 <div class="db-actions solo-caja">
     <button class="btn-database" id="btnExportarBD">Exportar BD</button>
     <button class="btn-database" id="btnImportarBD">Importar BD</button>
     <button class="btn-database" id="btnLimpiarBD">Limpiar BD</button>
     <input type="file" id="fileImportarBD" style="display:none;" accept=".json" />
+</div>
+<div class="solo-caja" style="margin-top:20px;text-align:center;">
+    <a href="catalogo.html" class="btn">📋 Administrar catálogo</a>
 </div>
 <!-- Modal de Login -->
 <div id="loginModal" style="position:fixed;z-index:9999;left:0;top:0;width:100vw;height:100vh;background:#fff;display:flex;align-items:center;justify-content:center;">
@@ -180,7 +195,7 @@
 </div>
 
 
-<!--<script>
+<script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
@@ -188,7 +203,9 @@ if ('serviceWorker' in navigator) {
       .catch(err => console.error("Error registrando Service Worker:", err));
   });
 }
-</script>-->
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="menu.js"></script>
 <script src="app.js?v=1.0.4"></script>
 </body>
 </html>
