@@ -3,6 +3,12 @@ margin: 0;
 padding: 0;
 box-sizing: border-box;
 }
+
+:root {
+  --color-terraza: #e0ffe0;
+  --color-salon: #e0eaff;
+  --color-barra: #ffe0e0;
+}
 body {
 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -556,6 +562,15 @@ font-size: 1.2em;
 .mesa-btn:active {
 box-shadow: 0 0 0 0 transparent;
 border-width: 3.5px;
+}
+.mesa-zona-terraza {
+  box-shadow: 0 0 0 3px var(--color-terraza) inset;
+}
+.mesa-zona-salon {
+  box-shadow: 0 0 0 3px var(--color-salon) inset;
+}
+.mesa-zona-barra {
+  box-shadow: 0 0 0 3px var(--color-barra) inset;
 }
 .mesas-seccion {
 display: flex;
