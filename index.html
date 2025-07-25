@@ -14,7 +14,6 @@
 <div class="container">
     <div class="header">
         <h1>🍽️ Sistema de Registro Pedidos - FESTEJOS</h1>
-        <button id="toggleDarkMode" title="Modo oscuro" style="position:absolute;top:10px;right:10px;" class="btn-secondary">🌙</button>
         <div class="date-info">
             <span id="currentDate"></span>
         </div>
@@ -131,18 +130,6 @@
     <button class="btn-database" id="btnLimpiarBD">Limpiar BD</button>
     <input type="file" id="fileImportarBD" style="display:none;" accept=".json" />
 </div>
-<div id="catalogAdmin" class="solo-caja" style="display:none;margin-top:30px;">
-    <h2>📋 Administrar catálogo</h2>
-    <form id="formNuevoProd" style="margin-bottom:15px;">
-        <input id="nuevoNombre" placeholder="Nombre" required>
-        <input id="nuevoPrecio" type="number" step="0.01" placeholder="Precio" required>
-        <button type="submit" class="btn">Agregar</button>
-    </form>
-    <table id="tablaCatalogo" style="width:100%;max-width:500px;">
-        <thead><tr><th>Producto</th><th>Precio</th><th></th></tr></thead>
-        <tbody id="catalogoBody"></tbody>
-    </table>
-</div>
 <!-- Modal de Login -->
 <div id="loginModal" style="position:fixed;z-index:9999;left:0;top:0;width:100vw;height:100vh;background:#fff;display:flex;align-items:center;justify-content:center;">
   <form id="loginForm" style="min-width:280px;padding:28px 24px;border-radius:12px;background:#eee;box-shadow:0 3px 18px #0003;">
@@ -195,7 +182,7 @@
 </div>
 
 
-<script>
+<!--<script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
@@ -203,7 +190,7 @@ if ('serviceWorker' in navigator) {
       .catch(err => console.error("Error registrando Service Worker:", err));
   });
 }
-</script>
+</script>-->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="app.js?v=1.0.4"></script>
 </body>

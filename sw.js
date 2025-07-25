@@ -1,6 +1,6 @@
 // sw.js
 
-const CACHE_NAME = 'festejos-cache-v3'; // incrementa versión al actualizar
+const CACHE_NAME = 'festejos-cache-v2'; // incrementa versión al actualizar
 const ASSETS = [
   '/',
   '/index.html',
