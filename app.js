@@ -8,6 +8,17 @@ const USUARIOS = {
 let usuarioActual = null;        // "caja" o "moso"
 let nombreMosoActual = null;     // nombre/alias del moso actual
 
+// ----- Modo oscuro -----
+const darkBtn = document.getElementById('toggleDarkMode');
+if (darkBtn) {
+  const pref = localStorage.getItem('darkMode');
+  if (pref === '1') document.body.classList.add('dark-mode');
+  darkBtn.onclick = () => {
+    const active = document.body.classList.toggle('dark-mode');
+    localStorage.setItem('darkMode', active ? '1' : '0');
+  };
+}
+
 // Mostrar/ocultar campo nombre moso según selección
 const usuarioSelect = document.getElementById('usuario');
 const nombreMosoBox = document.getElementById('nombreMosoBox');
@@ -95,6 +106,8 @@ function configurarUIporUsuario() {
 
   // Elementos solo para caja
   document.querySelectorAll('.solo-caja').forEach(el => el.style.display = esCaja ? '' : 'none');
+  const catalogAdmin = document.getElementById('catalogAdmin');
+  if (catalogAdmin) catalogAdmin.style.display = esCaja ? '' : 'none';
   // Pedidos especiales (solo caja)
   document.querySelectorAll('.pedido-especial-box').forEach(el => el.style.display = esCaja ? '' : 'none');
   // Solo mosos (si tienes)
@@ -110,6 +123,7 @@ function configurarUIporUsuario() {
     renderComandasCocina();
     activarAutoUpdateCocina && activarAutoUpdateCocina();
   }
+  if (esCaja) renderCatalogoAdmin();
 }
 let socket = null;
 
@@ -267,7 +281,9 @@ async function renderMesas() {
     cont.innerHTML = "";
 
     const today = new Date().toISOString().split('T')[0];
-    let pedidosArr = await db.pedidos.where("fecha").equals(today).toArray();
+    let pedidosArr = await db.pedidos.where("fecha").equals(today)
+        .filter(p => p.estado !== 'anulado')
+        .toArray();
     let pedidos = {};
     pedidosArr.forEach(p => {
         if (!pedidos[p.mesa]) pedidos[p.mesa] = [];
@@ -356,7 +372,7 @@ async function renderComandasCocina() {
     // Solo muestra pedidos NO libres y NO listos
     const pedidos = await db.pedidos
       .where("fecha").equals(today)
-      .filter(p => p.estado !== "libre" && p.estado !== "listo")
+      .filter(p => p.estado !== "libre" && p.estado !== "listo" && p.estado !== "anulado")
       .toArray();
 
     if (!pedidos.length) {
@@ -429,7 +445,7 @@ setInterval(async () => {
     const today = new Date().toISOString().split('T')[0];
     const pedidos = await db.pedidos
         .where("fecha").equals(today)
-        .filter(p => p.estado !== "libre" && p.estado !== "listo")
+        .filter(p => p.estado !== "libre" && p.estado !== "listo" && p.estado !== "anulado")
         .toArray();
 
     pedidos.forEach(p => {
@@ -502,7 +518,9 @@ function cerrarAlertaPedidoListo() {
 async function revisarPedidosListosParaMoso() {
   if (usuarioActual !== "moso") return;
   const today = new Date().toISOString().split('T')[0];
-  const pedidos = await db.pedidos.where({ fecha: today, creado_por: nombreMosoActual }).toArray();
+  const pedidos = await db.pedidos.where({ fecha: today, creado_por: nombreMosoActual })
+    .filter(p => p.estado !== 'anulado')
+    .toArray();
   pedidos.forEach(ped => {
     if(ped.detalle) {
       ped.detalle.forEach(plato => {
@@ -600,18 +618,8 @@ window.abrirPagoPedidoEspecial = function(idPedido, tipoPedido) {
             <button type="button" onclick="closeMesaModal()" class="btn-secondary" style="margin-top:12px;">Cancelar</button>
         </form>
     `);
-    // JS para seleccionar botón
-    const pagoBotones = document.querySelectorAll("#pagoBotones .btn-medio");
-    const inputTipoPago = document.getElementById("inputTipoPagoEspecial");
-    pagoBotones.forEach(btn => {
-        btn.onclick = function() {
-            pagoBotones.forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-            inputTipoPago.value = btn.getAttribute('data-pago');
-        };
-    });
-    // Preselecciona "efectivo"
-    pagoBotones[0].click();
+    const inputTipoPago = document.getElementById('inputTipoPagoEspecial');
+    setupPagoButtons('pagoBotones', 'inputTipoPagoEspecial');
 
     document.getElementById('pagoPedidoEspecialForm').onsubmit = function(e) {
         e.preventDefault();
@@ -677,14 +685,63 @@ window.pagarPedidoEspecial = async function(idPedido, tipoPedido, tipo_pago) {
 
 /* -------- MESAS CRUD ---------- */
 // ---- FLATTEN del catálogo agrupado ----
-const catalogoArray = [];
-let _id = 1;
-for (const key in catalogo) {
+let catalogoArray = JSON.parse(localStorage.getItem('catalogoCustom') || 'null');
+let catalogoNextId = 1;
+if (!catalogoArray) {
+  catalogoArray = [];
+  let _id = 1;
+  for (const key in catalogo) {
     if (Array.isArray(catalogo[key])) {
-        catalogo[key].forEach(prod => catalogoArray.push({ ...prod, id: _id++, categoria: key }));
+      catalogo[key].forEach(prod => catalogoArray.push({ ...prod, id: _id++, categoria: key }));
     } else if (typeof catalogo[key] === 'object') {
-        catalogoArray.push({ ...catalogo[key], id: _id++, categoria: key });
+      catalogoArray.push({ ...catalogo[key], id: _id++, categoria: key });
     }
+  }
+  catalogoNextId = _id;
+} else {
+  catalogoNextId = catalogoArray.reduce((m,p)=>Math.max(m,p.id),0) + 1;
+}
+
+function guardarCatalogo() {
+  localStorage.setItem('catalogoCustom', JSON.stringify(catalogoArray));
+}
+
+function setupAutocomplete(inputId, listId, onSelect) {
+    const inputEl = document.getElementById(inputId);
+    const listEl = document.getElementById(listId);
+    inputEl.oninput = () => {
+        const val = inputEl.value.trim().toLowerCase();
+        listEl.innerHTML = '';
+        listEl.style.display = 'none';
+        if (!val) return;
+        const sugerencias = catalogoArray.filter(p => p.nombre.toLowerCase().includes(val));
+        sugerencias.forEach(prod => {
+            const div = document.createElement('div');
+            div.textContent = `${prod.nombre} (S/ ${prod.precio.toFixed(2)})`;
+            div.onclick = () => {
+                inputEl.value = prod.nombre;
+                onSelect && onSelect(prod);
+                listEl.innerHTML = '';
+                listEl.style.display = 'none';
+            };
+            listEl.appendChild(div);
+        });
+        if (sugerencias.length) listEl.style.display = 'block';
+    };
+    inputEl.onblur = () => setTimeout(() => { listEl.style.display = 'none'; }, 150);
+}
+
+function setupPagoButtons(containerId, inputId) {
+    const buttons = document.querySelectorAll(`#${containerId} .btn-medio`);
+    const input = document.getElementById(inputId);
+    buttons.forEach(btn => {
+        btn.onclick = () => {
+            buttons.forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            input.value = btn.getAttribute('data-pago');
+        };
+    });
+    if (buttons[0]) buttons[0].click();
 }
 
 // ---- FUNCIÓN PRINCIPAL ----
@@ -712,11 +769,12 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
 
   let pagadoActual = pagado;
   let abonosStr = '';
+  let pedidoObj = null;
   if (idPedido) {
-    const pedido = await db.pedidos.get(idPedido);
-    if (pedido && pedido.abonos && Array.isArray(pedido.abonos) && pedido.abonos.length) {
-      pagadoActual = pedido.abonos.reduce((sum, a) => sum + Number(a.monto), 0);
-      abonosStr = pedido.abonos.map(a =>
+    pedidoObj = await db.pedidos.get(idPedido);
+    if (pedidoObj && pedidoObj.abonos && Array.isArray(pedidoObj.abonos) && pedidoObj.abonos.length) {
+      pagadoActual = pedidoObj.abonos.reduce((sum, a) => sum + Number(a.monto), 0);
+      abonosStr = pedidoObj.abonos.map(a =>
         `<div style="font-size:0.97em; color:#444; margin-bottom:2px;">
           ${a.tipo_pago.charAt(0).toUpperCase()+a.tipo_pago.slice(1)}: S/ ${Number(a.monto).toFixed(2)}
         </div>`
@@ -754,21 +812,14 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
         Saldo pendiente: S/ ${saldoPendiente.toFixed(2)}
     </div>
     ${botonesExtras}
-    <button class="btn-secondary" style="margin-top:10px;" onclick="agregarPlatosModal(${idPedido}, '${num}')">Agregar platos</button>
+    <button class="btn-secondary" style="margin-top:10px;" onclick="mostrarPrecuenta(${idPedido})">Solicitar Precuenta</button>
+    ${ (usuarioActual === 'moso' && pedidoObj && pedidoObj.enviado_cocina) ? '' : `<button class="btn-secondary" style="margin-top:10px;" onclick="editarPedidoModal(${idPedido}, '${num}')">${usuarioActual === 'moso' ? 'Editar pedido' : 'Agregar platos'}</button>`}
     <button class="btn-secondary" style="margin-top:10px;" onclick="closeMesaModal()">Cerrar</button>
   `);
 
   if (usuarioActual === 'caja' && document.getElementById('abonoForm')) {
-    const pagoBotones = document.querySelectorAll("#pagoBotones .btn-medio");
-    const inputTipoPago = document.getElementById("inputTipoPagoMesa");
-    pagoBotones.forEach(btn => {
-      btn.onclick = function() {
-        pagoBotones.forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
-        inputTipoPago.value = btn.getAttribute('data-pago');
-      };
-    });
-    pagoBotones[0].click();
+    const inputTipoPago = document.getElementById('inputTipoPagoMesa');
+    setupPagoButtons('pagoBotones', 'inputTipoPagoMesa');
 
     document.querySelector('#abonoForm input[name="abono"]').addEventListener('input', function() {
       let val = parseFloat(this.value) || 0;
@@ -890,34 +941,8 @@ function mostrarFormularioPorPlato(num) {
   showMesaModal(htmlForm);
 
   // ------- AUTOCOMPLETADO ---------
-  const productoInput = document.getElementById('productoInput');
-  const autocompleteList = document.getElementById('autocompleteList');
   let productoSeleccionado = null;
-
-  productoInput.oninput = function () {
-    let val = this.value.trim().toLowerCase();
-    autocompleteList.innerHTML = '';
-    autocompleteList.style.display = 'none';
-    if (!val) return;
-    const sugerencias = catalogoArray.filter(p => p.nombre.toLowerCase().includes(val));
-    sugerencias.forEach(prod => {
-      let div = document.createElement('div');
-      div.textContent = prod.nombre + " (S/ " + prod.precio.toFixed(2) + ")";
-      div.onclick = function () {
-        productoInput.value = prod.nombre;
-        productoSeleccionado = prod;
-        autocompleteList.innerHTML = '';
-        autocompleteList.style.display = 'none';
-      };
-      autocompleteList.appendChild(div);
-    });
-    if (sugerencias.length) {
-      autocompleteList.style.display = 'block';
-    }
-  };
-  productoInput.onblur = function () {
-    setTimeout(() => autocompleteList.style.display = 'none', 150);
-  };
+  setupAutocomplete('productoInput', 'autocompleteList', prod => productoSeleccionado = prod);
 
   // -------- AGREGAR PRODUCTO AL PEDIDO ---------
   document.getElementById('agregarBtn').onclick = function () {
@@ -979,13 +1004,13 @@ function mostrarFormularioPorPlato(num) {
 
 
 
-window.agregarPlatosModal = async function(idPedido, num) {
+window.editarPedidoModal = async function(idPedido, num) {
     const pedido = await db.pedidos.get(idPedido);
     if (!pedido) { showMessage('Pedido no encontrado', 'error'); return; }
     let pedidoDetalle = pedido.detalle ? [...pedido.detalle] : [];
 
     let htmlForm = `
-        <h3>Agregar platos a Mesa ${num}</h3>
+        <h3>Editar pedido Mesa ${num}</h3>
         <form id="agregarPlatosForm" autocomplete="off" style="margin:0">
             <div class="pedido-row">
                 <div class="pedido-col producto">
@@ -1028,33 +1053,8 @@ window.agregarPlatosModal = async function(idPedido, num) {
     showMesaModal(htmlForm);
 
     // ------- AUTOCOMPLETADO CORRECTO ---------
-    const productoInputAgregar = document.getElementById('productoInputAgregar');
-    const autocompleteListAgregar = document.getElementById('autocompleteListAgregar');
     let productoSeleccionadoAgregar = null;
-
-    productoInputAgregar.oninput = function () {
-        let val = this.value.trim().toLowerCase();
-        autocompleteListAgregar.innerHTML = '';
-        autocompleteListAgregar.style.display = 'none';
-        if (!val) return;
-        const sugerencias = catalogoArray.filter(p => p.nombre.toLowerCase().includes(val));
-        sugerencias.forEach(prod => {
-            let div = document.createElement('div');
-            div.textContent = prod.nombre + " (S/ " + prod.precio.toFixed(2) + ")";
-            div.onclick = function () {
-                productoInputAgregar.value = prod.nombre;
-                productoSeleccionadoAgregar = prod;
-                autocompleteListAgregar.innerHTML = '';
-                autocompleteListAgregar.style.display = 'none';
-            };
-            autocompleteListAgregar.appendChild(div);
-        });
-        if (sugerencias.length) {
-            autocompleteListAgregar.style.display = 'block';
-        }
-    };
-    // Oculta cuando pierdes foco
-    productoInputAgregar.onblur = function () { setTimeout(() => autocompleteListAgregar.style.display = 'none', 150); };
+    setupAutocomplete('productoInputAgregar', 'autocompleteListAgregar', prod => productoSeleccionadoAgregar = prod);
 
     // -------- AGREGAR PRODUCTO AL PEDIDO ---------
     document.getElementById('agregarBtnAgregar').onclick = function() {
@@ -1086,7 +1086,7 @@ window.agregarPlatosModal = async function(idPedido, num) {
             let tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${prod.nombre}</td>
-                <td>${prod.cantidad}</td>
+                <td><input type="number" class="cant-edit" data-idx="${idx}" value="${prod.cantidad}" min="1" style="width:60px"></td>
                 <td>S/ ${prod.precio.toFixed(2)}</td>
                 <td>S/ ${sub.toFixed(2)}</td>
                 <td>
@@ -1094,6 +1094,14 @@ window.agregarPlatosModal = async function(idPedido, num) {
                 </td>
             `;
             tbody.appendChild(tr);
+        });
+        tbody.querySelectorAll('.cant-edit').forEach(inp=>{
+            inp.onchange = e => {
+                const i = parseInt(e.target.dataset.idx);
+                let val = parseInt(e.target.value) || 1;
+                pedidoDetalle[i].cantidad = val;
+                renderTablaPedidoAgregar();
+            };
         });
         document.getElementById('pedidoTotalAgregar').innerText = "S/ " + total.toFixed(2);
     }
@@ -1108,11 +1116,16 @@ window.agregarPlatosModal = async function(idPedido, num) {
             showMessage("Debe agregar al menos un producto.", "error");
             return;
         }
-        await db.pedidos.update(idPedido, { detalle: detalle, monto: total });
+        await db.pedidos.update(idPedido, {
+            detalle: detalle,
+            monto: total,
+            ultima_edicion_por: usuarioActual === 'moso' ? nombreMosoActual : usuarioActual,
+            ultima_edicion_ts: new Date().toISOString()
+        });
         await renderMesas();
         await updateStats();
         await updateResumenPagadosTable();
-        showMessage('Platos agregados correctamente.');
+        showMessage('Pedido actualizado correctamente.');
         closeMesaModal();
     };
 };
@@ -1123,7 +1136,7 @@ async function crearPedido(num, monto, detalle = [], observacion = "") {
     const fecha = new Date().toISOString().split('T')[0];
     const pedidosActivos = await db.pedidos
         .where("fecha").equals(fecha)
-        .filter(p => p.mesa === num && p.estado !== "libre")
+        .filter(p => p.mesa === num && p.estado !== "libre" && p.estado !== "anulado")
         .toArray();
 
     if (pedidosActivos.length > 0) {
@@ -1187,7 +1200,10 @@ async function abonarPedido(idPedido, abono, tipo_pago, monto, pagado, num) {
 
 window.anularPedido = async function(idPedido, num) {
     if (confirm(`¿Anular pedido de Mesa ${num}? Esta acción no se puede deshacer.`)) {
-        await db.pedidos.delete(idPedido);
+        await db.pedidos.update(idPedido, {
+            estado: 'anulado',
+            fecha_anulado: new Date().toISOString()
+        });
         await renderMesas();
         await updateStats();
         await updateResumenPagadosTable();
@@ -1200,7 +1216,9 @@ window.anularPedido = async function(idPedido, num) {
 async function updateResumenPagadosTable() {
     const cont = document.getElementById('resumenPagadosTable');
     const today = new Date().toISOString().split('T')[0];
-    const rows = await db.pedidos.where("fecha").equals(today).filter(p => (p.pagado || 0) > 0).toArray();
+    const rows = await db.pedidos.where("fecha").equals(today)
+        .filter(p => (p.pagado || 0) > 0 && p.estado !== 'anulado')
+        .toArray();
     if (!rows.length) {
         cont.innerHTML = '<div style="color:#666;padding:15px;">No hay pedidos pagados aún.</div>';
         return;
@@ -1351,11 +1369,68 @@ window.imprimirDetalleAbonos = async function(idPedido) {
     w.document.close();
 };
 
+window.mostrarPrecuenta = async function(idPedido) {
+    const pedido = await db.pedidos.get(idPedido);
+    if (!pedido) return alert('Pedido no encontrado');
+    let nombre = pedido.nombre || '-';
+    let mesa = pedido.mesa === 0
+        ? (pedido.tipo_pedido === "para llevar" ? "Para Llevar"
+            : pedido.tipo_pedido === "delivery" ? "Delivery" : "Especial")
+        : "M" + pedido.mesa.toString().padStart(2, '0');
+
+    let productosHTML = `
+        <table border="1" cellpadding="7" cellspacing="0" style="width:100%;margin-top:8px;font-size:1em;">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>P. Unitario</th>
+                    <th>Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${(pedido.detalle || []).map((prod, i) => `
+                    <tr>
+                        <td style="text-align:center">${i + 1}</td>
+                        <td>${prod.nombre}</td>
+                        <td style="text-align:center">${prod.cantidad}</td>
+                        <td>S/ ${Number(prod.precio).toFixed(2)}</td>
+                        <td>S/ ${(prod.precio * prod.cantidad).toFixed(2)}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+
+    let html = `
+    <div style="font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;min-width:350px;">
+        <h2 style="text-align:center;margin-bottom:12px;">Precuenta</h2>
+        <b>Mesa/Pedido:</b> ${mesa} <br>
+        <b>Nombre:</b> ${nombre} <br>
+        ${productosHTML}
+        <div style="margin:13px 0 7px 0;">
+            <b>Total:</b> S/ ${Number(pedido.monto).toFixed(2)}
+        </div>
+    </div>
+    `;
+
+    let w = window.open('', '_blank', 'width=550,height=900');
+    w.document.write(`
+        <html><head><title>Precuenta</title></head><body>${html}
+        <br><button onclick="window.print();">Imprimir</button>
+        </body></html>
+    `);
+    w.document.close();
+};
+
 
 async function updateStats() {
     const today = new Date().toISOString().split('T')[0];
     const paymentTotals = { efectivo: 0, yape: 0, tarjeta: 0 };
-    const rows = await db.pedidos.where("fecha").equals(today).toArray();
+    const rows = await db.pedidos.where("fecha").equals(today)
+        .filter(p => p.estado !== 'anulado')
+        .toArray();
     for (const row of rows) {
         if (row.abonos && Array.isArray(row.abonos)) {
             row.abonos.forEach(ab => {
@@ -1411,7 +1486,7 @@ document.getElementById('btnGenerarReporte').onclick = async function() {
 
     const rows = await db.pedidos
         .where("fecha").between(inicio, fin, true, true)
-        .filter(p => p.pagado >= p.monto).toArray();
+        .filter(p => p.pagado >= p.monto && p.estado !== 'anulado').toArray();
 
     // Recalcular totales
     const paymentTotals = { efectivo: 0, yape: 0, tarjeta: 0 };
@@ -1463,6 +1538,60 @@ document.getElementById('btnGenerarReporte').onclick = async function() {
     document.getElementById('tablaReporte').innerHTML = html;
 };
 
+// ----- Gráfica de platos más consumidos -----
+let graficaPlatosChart = null;
+document.getElementById('btnGenerarGrafica').onclick = async function() {
+    const inicio = document.getElementById('fechaInicio').value;
+    const fin = document.getElementById('fechaFin').value;
+    if (!inicio || !fin) {
+        showMessage('Debe seleccionar ambas fechas', 'error');
+        return;
+    }
+    const rows = await db.pedidos
+        .where('fecha').between(inicio, fin, true, true)
+        .filter(p => p.estado !== 'anulado')
+        .toArray();
+    const conteo = {};
+    for (const row of rows) {
+        if (Array.isArray(row.detalle)) {
+            row.detalle.forEach(p => {
+                const nombre = p.nombre;
+                const cant = Number(p.cantidad) || 1;
+                conteo[nombre] = (conteo[nombre] || 0) + cant;
+            });
+        }
+    }
+    const items = Object.entries(conteo)
+        .sort((a,b) => b[1]-a[1])
+        .slice(0, 10);
+    if (!items.length) {
+        showMessage('No hay datos para ese rango', 'error');
+        return;
+    }
+    const labels = items.map(i => i[0]);
+    const data = items.map(i => i[1]);
+    const ctx = document.getElementById('graficaPlatos').getContext('2d');
+    if (graficaPlatosChart) graficaPlatosChart.destroy();
+    graficaPlatosChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Platos vendidos',
+                data: data,
+                backgroundColor: 'rgba(54, 162, 235, 0.6)'
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+    document.getElementById('graficaPlatos').style.display = 'block';
+};
+
 
 /* --------- Exportar/Importar/Limpiar BD --------- */
 document.getElementById('btnExportarBD').onclick = async function() {
@@ -1512,6 +1641,59 @@ document.getElementById('btnLimpiarBD').onclick = async function() {
     showMessage('Base de datos limpiada');
 };
 window.addEventListener('offline', () => alert('Estás sin conexión, pero puedes seguir trabajando. Los datos se guardan en el dispositivo.'));
+
+// ----- Panel de catálogo -----
+function renderCatalogoAdmin() {
+  const tbody = document.getElementById('catalogoBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  catalogoArray.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" class="cat-nombre" data-id="${item.id}" value="${item.nombre}"></td>
+      <td><input type="number" step="0.01" class="cat-precio" data-id="${item.id}" value="${item.precio}"></td>
+      <td><button class="btn-secondary btn-sm" data-id="${item.id}">🗑️</button></td>`;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('.cat-nombre').forEach(inp => {
+    inp.onchange = e => {
+      const id = parseInt(e.target.dataset.id);
+      const prod = catalogoArray.find(p=>p.id===id);
+      if (prod) prod.nombre = e.target.value.trim();
+      guardarCatalogo();
+    };
+  });
+  tbody.querySelectorAll('.cat-precio').forEach(inp => {
+    inp.onchange = e => {
+      const id = parseInt(e.target.dataset.id);
+      const prod = catalogoArray.find(p=>p.id===id);
+      if (prod) prod.precio = parseFloat(e.target.value) || 0;
+      guardarCatalogo();
+    };
+  });
+  tbody.querySelectorAll('button').forEach(btn => {
+    btn.onclick = () => {
+      const id = parseInt(btn.dataset.id);
+      catalogoArray = catalogoArray.filter(p=>p.id!==id);
+      guardarCatalogo();
+      renderCatalogoAdmin();
+    };
+  });
+}
+
+if (document.getElementById('formNuevoProd')) {
+  document.getElementById('formNuevoProd').onsubmit = e => {
+    e.preventDefault();
+    const nombre = document.getElementById('nuevoNombre').value.trim();
+    const precio = parseFloat(document.getElementById('nuevoPrecio').value);
+    if (!nombre || isNaN(precio)) return;
+    catalogoArray.push({id: catalogoNextId++, nombre, precio, categoria:'custom'});
+    document.getElementById('nuevoNombre').value='';
+    document.getElementById('nuevoPrecio').value='';
+    guardarCatalogo();
+    renderCatalogoAdmin();
+  };
+}
 
 window.onload = async function() {
     document.getElementById('nombreMosoBox').style.display = 'none';
