@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administrar catálogo</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#667eea">
+  <link rel="stylesheet" href="styles.css?v=1.0.4">
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>📋 Administrar catálogo</h1>
+    <button id="toggleDarkMode" title="Modo oscuro" style="position:fixed;top:16px;left:10px;z-index:8500;" class="btn-secondary">🌙</button>
+    <a href="index.html" class="btn-secondary" style="position:fixed;top:16px;right:10px;z-index:8500;">Volver</a>
+  </div>
+  <div id="catalogAdmin" style="margin-top:30px;">
+    <form id="formNuevoProd" style="margin-bottom:15px;">
+      <input id="nuevoNombre" placeholder="Nombre" required>
+      <input id="nuevoPrecio" type="number" step="0.01" placeholder="Precio" required>
+      <button type="submit" class="btn">Agregar</button>
+    </form>
+    <table id="tablaCatalogo" style="width:100%;max-width:500px;">
+      <thead><tr><th>Producto</th><th>Precio</th><th></th></tr></thead>
+      <tbody id="catalogoBody"></tbody>
+    </table>
+  </div>
+</div>
+<script src="catalog-admin.js?v=1.0.0"></script>
+</body>
+</html>
