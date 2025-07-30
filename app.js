@@ -77,6 +77,10 @@ document.getElementById('loginForm').onsubmit = function(e) {
 
         ocultarLogin();
         initApp();
+        conectarSocket(usuarioActual);
+        if ('Notification' in window && Notification.permission !== 'granted') {
+            Notification.requestPermission();
+        }
         document.getElementById('clave').value = "";
         if(usuarioActual === "cocina") activarAutoUpdateCocina();
         else if(cocinaInterval) clearInterval(cocinaInterval);
@@ -127,24 +131,24 @@ function configurarUIporUsuario() {
 }
 let socket = null;
 
-/*function conectarSocket(rol) {
-    socket = io("http://localhost:4000"); // Cambia a tu IP/LAN si es necesario
+function conectarSocket(rol) {
+    // Utiliza el servidor de Render en producción
+    socket = io("https://fetregapi.onrender.com");
     socket.emit("identificarse", rol);
 
-    // Recibe eventos según el rol
     if (rol === 'caja') {
         socket.on('pedidoRecibido', pedido => {
-            // Aquí actualizas la UI de caja en tiempo real
             showMessage("Nuevo pedido recibido: Mesa " + pedido.mesa);
-            // ...actualiza tablas, etc.
+            mostrarNotificacion('Nuevo pedido', { body: 'Mesa ' + pedido.mesa });
         });
     }
     if (rol === 'moso') {
         socket.on('respuestaDeCaja', datos => {
             showMessage("Caja respondió: " + JSON.stringify(datos));
+            mostrarNotificacion('Respuesta de caja', { body: JSON.stringify(datos) });
         });
     }
-}*/
+}
 
 
 /* --------- Dexie DB setup --------- */
@@ -203,6 +207,14 @@ const db = new Dexie("FestejosDB");
 db.version(3).stores({
     pedidos: "++id,fecha,hora,mesa,monto,tipo_pedido,tipo_pago,pagado,estado,timestamp,nombre,abonos",
     configuracion: "++id,fecha,caja_apertura,cerrada,fecha_cierre"
+});
+db.version(4).stores({
+    pedidos: "++id,fecha,hora,mesa,monto,tipo_pedido,tipo_pago,pagado,estado,timestamp,nombre,abonos,enviado_cocina",
+    configuracion: "++id,fecha,caja_apertura,cerrada,fecha_cierre"
+}).upgrade(tx => {
+    return tx.pedidos.toCollection().modify(p => {
+        if (typeof p.enviado_cocina === 'undefined') p.enviado_cocina = false;
+    });
 });
 
 const TOTAL_MESAS = 27;
@@ -433,6 +445,16 @@ function showVisualNotification(msg) {
     document.body.appendChild(div);
     setTimeout(() => div.remove(), 3300);
 }
+
+function mostrarNotificacion(titulo, opciones = {}) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+        navigator.serviceWorker.getRegistration().then(reg => {
+            if (reg) reg.showNotification(titulo, opciones);
+            else new Notification(titulo, opciones);
+        });
+    }
+}
 // ========== NOTIFICACIÓN DE PEDIDO DEMORADO ==========
 
 // Para evitar notificaciones duplicadas, guarda los IDs ya notificados
@@ -454,6 +476,7 @@ setInterval(async () => {
             if (!pedidosDemoradosNotificados.has(p.id)) {
                 playNotificationSound();
                 showVisualNotification(`¡Atención! Pedido de mesa ${p.mesa || '-'} lleva más de ${minutosDemora} min.`);
+                mostrarNotificacion('Pedido demorado', { body: `Mesa ${p.mesa || '-'} lleva más de ${minutosDemora} min.` });
                 pedidosDemoradosNotificados.add(p.id);
             }
         }
@@ -570,12 +593,15 @@ async function crearPedidoEspecial(tipoPedido, nombre, monto) {
     const fecha = new Date().toISOString().split('T')[0];
     const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
     const timestamp = new Date().toISOString();
-    await db.pedidos.add({
+    const id = await db.pedidos.add({
         enviado_cocina: false,
         fecha, hora, mesa: 0, monto,
         tipo_pedido: tipoPedido, tipo_pago: '', pagado: 0,
         estado: "ocupada", timestamp, nombre
     });
+    if (typeof socket !== 'undefined' && socket) {
+        socket.emit('nuevoPedido', { mesa: 0, tipo_pedido: tipoPedido });
+    }
     await renderPedidosEspeciales();
     await updateStats();
     await updateResumenPagadosTable();
@@ -812,6 +838,7 @@ async function clickMesa(num, idPedido, estado, monto, pagado) {
         Saldo pendiente: S/ ${saldoPendiente.toFixed(2)}
     </div>
     ${botonesExtras}
+    <button class="btn-secondary" style="margin-top:10px;" onclick="mostrarPrecuenta(${idPedido})">Solicitar Precuenta</button>
     ${ (usuarioActual === 'moso' && pedidoObj && pedidoObj.enviado_cocina) ? '' : `<button class="btn-secondary" style="margin-top:10px;" onclick="editarPedidoModal(${idPedido}, '${num}')">${usuarioActual === 'moso' ? 'Editar pedido' : 'Agregar platos'}</button>`}
     <button class="btn-secondary" style="margin-top:10px;" onclick="closeMesaModal()">Cerrar</button>
   `);
@@ -1153,8 +1180,8 @@ async function crearPedido(num, monto, detalle = [], observacion = "") {
         enviado_cocina: false
     });
 
-    // 🚦 Aquí notificas por socket si eres mozo
-    if (typeof socket !== 'undefined' && socket && usuarioActual === "moso") {
+    // Notifica del nuevo pedido a otras cajas
+    if (typeof socket !== 'undefined' && socket) {
         socket.emit('nuevoPedido', { mesa: num, detalle, observacion });
     }
 
@@ -1362,6 +1389,61 @@ window.imprimirDetalleAbonos = async function(idPedido) {
     let w = window.open('', '_blank', 'width=550,height=900');
     w.document.write(`
         <html><head><title>Detalle de Pedido</title></head><body>${html}
+        <br><button onclick="window.print();">Imprimir</button>
+        </body></html>
+    `);
+    w.document.close();
+};
+
+window.mostrarPrecuenta = async function(idPedido) {
+    const pedido = await db.pedidos.get(idPedido);
+    if (!pedido) return alert('Pedido no encontrado');
+    let nombre = pedido.nombre || '-';
+    let mesa = pedido.mesa === 0
+        ? (pedido.tipo_pedido === "para llevar" ? "Para Llevar"
+            : pedido.tipo_pedido === "delivery" ? "Delivery" : "Especial")
+        : "M" + pedido.mesa.toString().padStart(2, '0');
+
+    let productosHTML = `
+        <table border="1" cellpadding="7" cellspacing="0" style="width:100%;margin-top:8px;font-size:1em;">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Producto</th>
+                    <th>Cantidad</th>
+                    <th>P. Unitario</th>
+                    <th>Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${(pedido.detalle || []).map((prod, i) => `
+                    <tr>
+                        <td style="text-align:center">${i + 1}</td>
+                        <td>${prod.nombre}</td>
+                        <td style="text-align:center">${prod.cantidad}</td>
+                        <td>S/ ${Number(prod.precio).toFixed(2)}</td>
+                        <td>S/ ${(prod.precio * prod.cantidad).toFixed(2)}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+
+    let html = `
+    <div style="font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;min-width:350px;">
+        <h2 style="text-align:center;margin-bottom:12px;">Precuenta</h2>
+        <b>Mesa/Pedido:</b> ${mesa} <br>
+        <b>Nombre:</b> ${nombre} <br>
+        ${productosHTML}
+        <div style="margin:13px 0 7px 0;">
+            <b>Total:</b> S/ ${Number(pedido.monto).toFixed(2)}
+        </div>
+    </div>
+    `;
+
+    let w = window.open('', '_blank', 'width=550,height=900');
+    w.document.write(`
+        <html><head><title>Precuenta</title></head><body>${html}
         <br><button onclick="window.print();">Imprimir</button>
         </body></html>
     `);
@@ -1652,7 +1734,10 @@ window.onload = async function() {
     if (usuarioActual) {
         ocultarLogin();
         initApp();
-        //conectarSocket(usuarioActual);    // <---- AGREGADO AQUÍ
+        conectarSocket(usuarioActual);
+        if ('Notification' in window && Notification.permission !== 'granted') {
+            Notification.requestPermission();
+        }
         if(usuarioActual === "cocina") activarAutoUpdateCocina();
         else if(typeof cocinaInterval !== "undefined" && cocinaInterval) clearInterval(cocinaInterval);
     } else {
