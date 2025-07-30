@@ -132,7 +132,8 @@ function configurarUIporUsuario() {
 let socket = null;
 
 function conectarSocket(rol) {
-    socket = io("http://localhost:4000"); // Cambia a tu IP/LAN si es necesario
+    // Utiliza el servidor de Render en producción
+    socket = io("https://fetregapi.onrender.com");
     socket.emit("identificarse", rol);
 
     if (rol === 'caja' || rol === 'cocina') {
