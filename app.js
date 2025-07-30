@@ -683,7 +683,10 @@ function imprimirComandaCocina(pedido) {
     w.document.close();
 }
 setInterval(async () => {
-    const pedidos = await db.pedidos.where({ enviado_cocina: false }).toArray();
+    const pedidos = await db.pedidos
+        .where('enviado_cocina')
+        .equals(false)
+        .toArray();
     const now = Date.now();
     pedidos.forEach(p => {
         let t1 = new Date(p.timestamp).getTime();
