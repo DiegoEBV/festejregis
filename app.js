@@ -77,10 +77,6 @@ document.getElementById('loginForm').onsubmit = function(e) {
 
         ocultarLogin();
         initApp();
-        conectarSocket(usuarioActual);
-        if ('Notification' in window && Notification.permission !== 'granted') {
-            Notification.requestPermission();
-        }
         document.getElementById('clave').value = "";
         if(usuarioActual === "cocina") activarAutoUpdateCocina();
         else if(cocinaInterval) clearInterval(cocinaInterval);
@@ -131,23 +127,24 @@ function configurarUIporUsuario() {
 }
 let socket = null;
 
-function conectarSocket(rol) {
+/*function conectarSocket(rol) {
     socket = io("http://localhost:4000"); // Cambia a tu IP/LAN si es necesario
     socket.emit("identificarse", rol);
 
-    if (rol === 'caja' || rol === 'cocina') {
+    // Recibe eventos según el rol
+    if (rol === 'caja') {
         socket.on('pedidoRecibido', pedido => {
+            // Aquí actualizas la UI de caja en tiempo real
             showMessage("Nuevo pedido recibido: Mesa " + pedido.mesa);
-            mostrarNotificacion('Nuevo pedido', { body: 'Mesa ' + pedido.mesa });
+            // ...actualiza tablas, etc.
         });
     }
     if (rol === 'moso') {
         socket.on('respuestaDeCaja', datos => {
             showMessage("Caja respondió: " + JSON.stringify(datos));
-            mostrarNotificacion('Respuesta de caja', { body: JSON.stringify(datos) });
         });
     }
-}
+}*/
 
 
 /* --------- Dexie DB setup --------- */
@@ -436,16 +433,6 @@ function showVisualNotification(msg) {
     document.body.appendChild(div);
     setTimeout(() => div.remove(), 3300);
 }
-
-function mostrarNotificacion(titulo, opciones = {}) {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'granted') {
-        navigator.serviceWorker.getRegistration().then(reg => {
-            if (reg) reg.showNotification(titulo, opciones);
-            else new Notification(titulo, opciones);
-        });
-    }
-}
 // ========== NOTIFICACIÓN DE PEDIDO DEMORADO ==========
 
 // Para evitar notificaciones duplicadas, guarda los IDs ya notificados
@@ -467,7 +454,6 @@ setInterval(async () => {
             if (!pedidosDemoradosNotificados.has(p.id)) {
                 playNotificationSound();
                 showVisualNotification(`¡Atención! Pedido de mesa ${p.mesa || '-'} lleva más de ${minutosDemora} min.`);
-                mostrarNotificacion('Pedido demorado', { body: `Mesa ${p.mesa || '-'} lleva más de ${minutosDemora} min.` });
                 pedidosDemoradosNotificados.add(p.id);
             }
         }
@@ -1722,10 +1708,7 @@ window.onload = async function() {
     if (usuarioActual) {
         ocultarLogin();
         initApp();
-        conectarSocket(usuarioActual);
-        if ('Notification' in window && Notification.permission !== 'granted') {
-            Notification.requestPermission();
-        }
+        //conectarSocket(usuarioActual);    // <---- AGREGADO AQUÍ
         if(usuarioActual === "cocina") activarAutoUpdateCocina();
         else if(typeof cocinaInterval !== "undefined" && cocinaInterval) clearInterval(cocinaInterval);
     } else {

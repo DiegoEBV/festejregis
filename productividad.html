@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Productividad por mozo</title>
   <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#667eea">
   <link rel="stylesheet" href="styles.css?v=1.0.4">
 </head>
 <body>
@@ -23,7 +21,6 @@
   <div class="header">
     <h1>📈 Productividad por mozo</h1>
     <button id="toggleDarkMode" title="Modo oscuro" style="position:fixed;left:50px;top:16px;z-index:8500;" class="btn-secondary">🌙</button>
-    <button id="installBtn" onclick="installApp()" style="display:none;position:fixed;left:110px;top:16px;z-index:8500;" class="btn-secondary">⬇️ Instalar</button>
   </div>
   <div style="margin-bottom:20px;display:flex;gap:10px;align-items:end;flex-wrap:wrap;">
     <div>
@@ -39,7 +36,6 @@
   <div id="prodTabla"></div>
 </div>
 <script src="menu.js"></script>
-<script src="pwa.js"></script>
 <script src="productividad.js"></script>
 </body>
 </html>
