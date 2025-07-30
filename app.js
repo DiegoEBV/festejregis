@@ -209,11 +209,17 @@ db.version(3).stores({
     configuracion: "++id,fecha,caja_apertura,cerrada,fecha_cierre"
 });
 db.version(4).stores({
+    // 'enviado_cocina' se almacena como 0/1 para permitir indexar
     pedidos: "++id,fecha,hora,mesa,monto,tipo_pedido,tipo_pago,pagado,estado,timestamp,nombre,abonos,enviado_cocina",
     configuracion: "++id,fecha,caja_apertura,cerrada,fecha_cierre"
 }).upgrade(tx => {
+    // Convertir valor booleano a entero (0/1) para poder consultarlo por índice
     return tx.pedidos.toCollection().modify(p => {
-        if (typeof p.enviado_cocina === 'undefined') p.enviado_cocina = false;
+        if (typeof p.enviado_cocina === 'undefined') {
+            p.enviado_cocina = 0;
+        } else {
+            p.enviado_cocina = p.enviado_cocina ? 1 : 0;
+        }
     });
 });
 
@@ -594,7 +600,7 @@ async function crearPedidoEspecial(tipoPedido, nombre, monto) {
     const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
     const timestamp = new Date().toISOString();
     const id = await db.pedidos.add({
-        enviado_cocina: false,
+        enviado_cocina: 0,
         fecha, hora, mesa: 0, monto,
         tipo_pedido: tipoPedido, tipo_pago: '', pagado: 0,
         estado: "ocupada", timestamp, nombre
@@ -660,7 +666,7 @@ async function enviarPedidoACocina(pedidoId) {
     if (!pedido) return;
     // Aquí tu lógica de impresión
     imprimirComandaCocina(pedido); // la función que imprime
-    await db.pedidos.update(pedidoId, { enviado_cocina: true });
+    await db.pedidos.update(pedidoId, { enviado_cocina: 1 });
     showMessage("Comanda enviada a cocina e impresa.");
 }
 function imprimirComandaCocina(pedido) {
@@ -685,7 +691,7 @@ function imprimirComandaCocina(pedido) {
 setInterval(async () => {
     const pedidos = await db.pedidos
         .where('enviado_cocina')
-        .equals(false)
+        .equals(0)
         .toArray();
     const now = Date.now();
     pedidos.forEach(p => {
@@ -1180,7 +1186,7 @@ async function crearPedido(num, monto, detalle = [], observacion = "") {
         detalle,
         observacion,
         creado_por: usuarioActual === 'moso' ? nombreMosoActual : null,
-        enviado_cocina: false
+        enviado_cocina: 0
     });
 
     // Notifica del nuevo pedido a otras cajas
