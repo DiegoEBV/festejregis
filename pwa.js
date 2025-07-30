@@ -1,5 +1,5 @@
 // pwa.js - registro de service worker e instalación
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(err => console.error('SW error', err));
   });
