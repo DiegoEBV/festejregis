@@ -136,7 +136,7 @@ function conectarSocket(rol) {
     socket = io("https://fetregapi.onrender.com");
     socket.emit("identificarse", rol);
 
-    if (rol === 'caja' || rol === 'cocina') {
+    if (rol === 'caja') {
         socket.on('pedidoRecibido', pedido => {
             showMessage("Nuevo pedido recibido: Mesa " + pedido.mesa);
             mostrarNotificacion('Nuevo pedido', { body: 'Mesa ' + pedido.mesa });
@@ -207,6 +207,14 @@ const db = new Dexie("FestejosDB");
 db.version(3).stores({
     pedidos: "++id,fecha,hora,mesa,monto,tipo_pedido,tipo_pago,pagado,estado,timestamp,nombre,abonos",
     configuracion: "++id,fecha,caja_apertura,cerrada,fecha_cierre"
+});
+db.version(4).stores({
+    pedidos: "++id,fecha,hora,mesa,monto,tipo_pedido,tipo_pago,pagado,estado,timestamp,nombre,abonos,enviado_cocina",
+    configuracion: "++id,fecha,caja_apertura,cerrada,fecha_cierre"
+}).upgrade(tx => {
+    return tx.pedidos.toCollection().modify(p => {
+        if (typeof p.enviado_cocina === 'undefined') p.enviado_cocina = false;
+    });
 });
 
 const TOTAL_MESAS = 27;
@@ -585,12 +593,15 @@ async function crearPedidoEspecial(tipoPedido, nombre, monto) {
     const fecha = new Date().toISOString().split('T')[0];
     const hora = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
     const timestamp = new Date().toISOString();
-    await db.pedidos.add({
+    const id = await db.pedidos.add({
         enviado_cocina: false,
         fecha, hora, mesa: 0, monto,
         tipo_pedido: tipoPedido, tipo_pago: '', pagado: 0,
         estado: "ocupada", timestamp, nombre
     });
+    if (typeof socket !== 'undefined' && socket) {
+        socket.emit('nuevoPedido', { mesa: 0, tipo_pedido: tipoPedido });
+    }
     await renderPedidosEspeciales();
     await updateStats();
     await updateResumenPagadosTable();
@@ -1169,8 +1180,8 @@ async function crearPedido(num, monto, detalle = [], observacion = "") {
         enviado_cocina: false
     });
 
-    // 🚦 Aquí notificas por socket si eres mozo
-    if (typeof socket !== 'undefined' && socket && usuarioActual === "moso") {
+    // Notifica del nuevo pedido a otras cajas
+    if (typeof socket !== 'undefined' && socket) {
         socket.emit('nuevoPedido', { mesa: num, detalle, observacion });
     }
 
