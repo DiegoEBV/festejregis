@@ -1,0 +1,98 @@
+<button id="menuButton" class="menu-button">☰</button>
+<nav id="sideMenu" class="side-menu">
+  <ul>
+    <li><a routerLink="/">Inicio</a></li>
+    <li><a routerLink="/catalogo">Catálogo</a></li>
+    <li><a routerLink="/historial">Historial</a></li>
+    <li><a routerLink="/productividad">Productividad</a></li>
+  </ul>
+</nav>
+
+<div class="container">
+  <div class="header">
+    <h1>📋 Administración de Catálogo</h1>
+    <button routerLink="/" class="btn-back">Volver al Inicio</button>
+  </div>
+  
+  <div class="catalogo-container">
+    <div class="categorias-sidebar">
+      <h2>Categorías</h2>
+      <ul class="categoria-list">
+        <li *ngFor="let categoria of categorias" 
+            [class.active]="categoriaSeleccionada === categoria"
+            (click)="cambiarCategoria(categoria); productoSeleccionado = null">
+          {{ categoria | titlecase }}
+        </li>
+      </ul>
+    </div>
+    
+    <div class="productos-content">
+      <h2>{{ categoriaSeleccionada | titlecase }}</h2>
+      
+      <div class="productos-grid" *ngIf="!productoSeleccionado">
+        <div class="producto-card" *ngFor="let producto of obtenerProductos()">
+          <div class="producto-info">
+            <h3>{{ producto.nombre }}</h3>
+            <p class="precio">S/ {{ producto.precio.toFixed(2) }}</p>
+          </div>
+          <div class="producto-actions">
+            <button class="btn-edit" (click)="seleccionarProducto(producto)">✏️</button>
+            <button class="btn-delete" (click)="eliminarProducto(producto)">🗑️</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="producto-form" *ngIf="productoSeleccionado">
+        <h3>Editar Producto</h3>
+        <div class="form-group">
+          <label for="nombreProducto">Nombre:</label>
+          <input type="text" id="nombreProducto" [(ngModel)]="productoSeleccionado.nombre" placeholder="Nombre del producto">
+        </div>
+        <div class="form-group">
+          <label for="precioProducto">Precio (S/.):</label>
+          <input type="number" id="precioProducto" [(ngModel)]="productoSeleccionado.precio" placeholder="0.00" step="0.01">
+        </div>
+        <div class="form-actions">
+          <button class="btn" (click)="guardarProducto()">Guardar</button>
+          <button class="btn-secondary" (click)="cancelarEdicion()">Cancelar</button>
+        </div>
+      </div>
+      
+      <div class="nuevo-producto" *ngIf="!productoSeleccionado">
+        <h3>Agregar Nuevo Producto</h3>
+        <div class="form-group">
+          <label for="nuevoNombre">Nombre:</label>
+          <input type="text" id="nuevoNombre" [(ngModel)]="nuevoProducto.nombre" placeholder="Nombre del producto">
+        </div>
+        <div class="form-group">
+          <label for="nuevoPrecio">Precio (S/.):</label>
+          <input type="number" id="nuevoPrecio" [(ngModel)]="nuevoProducto.precio" placeholder="0.00" step="0.01">
+        </div>
+        <button class="btn" (click)="agregarProducto()">Agregar Producto</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="alertaPedidoListo" style="
+    display:none;
+    position:fixed;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    background:#3fa943;
+    color:#fff;
+    padding:22px 38px;
+    border-radius:16px;
+    box-shadow:0 6px 24px #0005;
+    z-index:9000;
+    min-width:220px;
+    max-width:90vw;
+    text-align:center;
+">
+  <div id="alertaMsg"></div>
+  <div id="barraCarga" style="margin-top:12px; background:#fff3; border-radius:8px; height:9px; width:100%;">
+    <div id="barraProgreso" style="height:100%; background:#fff; width:0%; border-radius:8px;"></div>
+  </div>
+  <button (click)="notificationService.cerrarAlerta()" style="margin-top:10px; background:#fff2; border:none; color:#fff; border-radius:6px; padding:4px 16px; cursor:pointer;">Cerrar</button>
+</div>

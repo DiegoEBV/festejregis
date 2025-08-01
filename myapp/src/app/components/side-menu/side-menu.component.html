@@ -1,0 +1,53 @@
+<div class="side-menu-overlay" [class.active]="menuOpen" (click)="closeMenu()"></div>
+
+<div class="side-menu" [class.open]="menuOpen">
+  <div class="side-menu-header">
+    <h2>FESTEJOS</h2>
+    <button class="close-menu-btn" (click)="closeMenu()">×</button>
+  </div>
+  
+  <div class="side-menu-content">
+    <div class="user-info" *ngIf="authService.currentUserValue">
+      <div class="user-avatar">{{ authService.currentUserValue.nombre.charAt(0) }}</div>
+      <div class="user-details">
+        <div class="user-name">{{ authService.currentUserValue.nombre }}</div>
+        <div class="user-role">{{ authService.currentUserValue.rol }}</div>
+      </div>
+    </div>
+    
+    <div class="menu-items">
+      <button class="menu-item" (click)="navigateTo('')">
+        <span class="menu-icon">🏠</span>
+        <span class="menu-text">Inicio</span>
+      </button>
+      
+      <button class="menu-item" (click)="navigateTo('catalogo')" *ngIf="authService.isCajero()">
+        <span class="menu-icon">📋</span>
+        <span class="menu-text">Catálogo</span>
+      </button>
+      
+      <button class="menu-item" (click)="navigateTo('historial')" *ngIf="authService.isCajero()">
+        <span class="menu-icon">📊</span>
+        <span class="menu-text">Historial</span>
+      </button>
+      
+      <button class="menu-item" (click)="navigateTo('productividad')" *ngIf="authService.isCajero()">
+        <span class="menu-icon">📈</span>
+        <span class="menu-text">Productividad</span>
+      </button>
+    </div>
+  </div>
+  
+  <div class="side-menu-footer">
+    <button class="logout-btn" (click)="logout()" *ngIf="authService.isAuthenticated()">
+      <span class="menu-icon">🚪</span>
+      <span class="menu-text">Cerrar Sesión</span>
+    </button>
+  </div>
+</div>
+
+<button class="menu-toggle-btn" [class.hidden]="menuOpen" (click)="toggleMenu()">
+  <span></span>
+  <span></span>
+  <span></span>
+</button>

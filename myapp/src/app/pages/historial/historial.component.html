@@ -1,0 +1,118 @@
+<button id="menuButton" class="menu-button">☰</button>
+<nav id="sideMenu" class="side-menu">
+  <ul>
+    <li><a routerLink="/">Inicio</a></li>
+    <li><a routerLink="/catalogo">Catálogo</a></li>
+    <li><a routerLink="/historial">Historial</a></li>
+    <li><a routerLink="/productividad">Productividad</a></li>
+  </ul>
+</nav>
+
+<div class="container">
+  <div class="header">
+    <h1>📜 Historial de Pedidos</h1>
+    <button routerLink="/" class="btn-back">Volver al Inicio</button>
+  </div>
+  
+  <div class="filtros-container">
+    <h2>Filtros</h2>
+    <div class="filtros-grid">
+      <div class="filtro-grupo">
+        <label for="fechaInicio">Fecha Inicio:</label>
+        <input type="date" id="fechaInicio" [(ngModel)]="fechaInicio">
+      </div>
+      
+      <div class="filtro-grupo">
+        <label for="fechaFin">Fecha Fin:</label>
+        <input type="date" id="fechaFin" [(ngModel)]="fechaFin">
+      </div>
+      
+      <div class="filtro-grupo">
+        <label for="filtroTipo">Tipo:</label>
+        <select id="filtroTipo" [(ngModel)]="filtroTipo">
+          <option value="todos">Todos</option>
+          <option value="mesa">Mesa</option>
+          <option value="paraLlevar">Para Llevar</option>
+          <option value="delivery">Delivery</option>
+        </select>
+      </div>
+      
+      <div class="filtro-grupo">
+        <label for="filtroMetodoPago">Método de Pago:</label>
+        <select id="filtroMetodoPago" [(ngModel)]="filtroMetodoPago">
+          <option value="todos">Todos</option>
+          <option value="efectivo">Efectivo</option>
+          <option value="yape">Yape</option>
+          <option value="tarjeta">Tarjeta</option>
+        </select>
+      </div>
+      
+      <div class="filtro-acciones">
+        <button class="btn" (click)="aplicarFiltros()">Aplicar Filtros</button>
+        <button class="btn-secondary" (click)="limpiarFiltros()">Limpiar</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="resumen-container">
+    <div class="summary-cards">
+      <div class="summary-card total">
+        <h3>💰 Total</h3>
+        <div class="amount">S/ {{ calcularTotal().toFixed(2) }}</div>
+      </div>
+      
+      <div class="summary-card efectivo">
+        <h3>💵 Efectivo</h3>
+        <div class="amount">S/ {{ calcularTotalPorMetodo('efectivo').toFixed(2) }}</div>
+      </div>
+      
+      <div class="summary-card yape">
+        <h3>📱 Yape</h3>
+        <div class="amount">S/ {{ calcularTotalPorMetodo('yape').toFixed(2) }}</div>
+      </div>
+      
+      <div class="summary-card tarjeta">
+        <h3>💳 Tarjeta</h3>
+        <div class="amount">S/ {{ calcularTotalPorMetodo('tarjeta').toFixed(2) }}</div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="historial-container">
+    <div class="historial-header">
+      <h2>Resultados ({{ historialPedidos.length }})</h2>
+      <button class="btn-export" (click)="exportarCSV()" *ngIf="historialPedidos.length > 0">📊 Exportar CSV</button>
+    </div>
+    
+    <div class="tabla-container" *ngIf="historialPedidos.length > 0">
+      <table class="tabla-historial">
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Número</th>
+            <th>Fecha</th>
+            <th>Total</th>
+            <th>Método</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let pedido of historialPedidos">
+            <td>{{ pedido.tipo }}</td>
+            <td>{{ pedido.numero }}</td>
+            <td>{{ pedido.fecha | date:'short' }}</td>
+            <td>S/ {{ pedido.total.toFixed(2) }}</td>
+            <td>{{ pedido.metodoPago }}</td>
+            <td>
+              <button class="btn-small" (click)="verDetallesPedido(pedido)">Ver detalles</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="no-resultados" *ngIf="historialPedidos.length === 0">
+      <p>No se encontraron resultados para los filtros seleccionados.</p>
+    </div>
+  </div>
+</div>
