@@ -1,0 +1,4 @@
+<button class="dark-mode-toggle" (click)="toggleDarkMode()" [title]="isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'">
+  <span class="icon" *ngIf="!isDarkMode">🌙</span>
+  <span class="icon" *ngIf="isDarkMode">☀️</span>
+</button>

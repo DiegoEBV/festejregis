@@ -1,0 +1,113 @@
+<button id="menuButton" class="menu-button">☰</button>
+<nav id="sideMenu" class="side-menu">
+  <ul>
+    <li><a routerLink="/">Inicio</a></li>
+    <li><a routerLink="/catalogo" *ngIf="authService.isCaja()">Catálogo</a></li>
+    <li><a routerLink="/historial" *ngIf="authService.isCaja()">Historial</a></li>
+    <li><a routerLink="/productividad" *ngIf="authService.isCaja()">Productividad</a></li>
+  </ul>
+</nav>
+
+<div class="container">
+  <div class="header">
+    <h1>📊 Análisis de Productividad</h1>
+    <button routerLink="/" class="btn-back">Volver al Inicio</button>
+  </div>
+  
+  <div class="filtros-container">
+    <h2>Período de Análisis</h2>
+    <div class="filtros-grid">
+      <div class="filtro-grupo">
+        <label for="fechaInicio">Fecha Inicio:</label>
+        <input type="date" id="fechaInicio" [(ngModel)]="fechaInicio">
+      </div>
+      
+      <div class="filtro-grupo">
+        <label for="fechaFin">Fecha Fin:</label>
+        <input type="date" id="fechaFin" [(ngModel)]="fechaFin">
+      </div>
+      
+      <div class="filtro-acciones">
+        <button class="btn" (click)="generarReporte()">Generar Reporte</button>
+        <button class="btn-secondary" (click)="establecerFechaHoy()">📅 Hoy</button>
+        <button class="btn-secondary" (click)="establecerUltimaSemana()">📊 Última Semana</button>
+        <button class="btn-export" (click)="exportarCSV()" *ngIf="ventasPorDia.length > 0">📊 Exportar CSV</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="resumen-container">
+    <div class="summary-cards">
+      <div class="summary-card total">
+        <h3>💰 Total Ventas</h3>
+        <div class="amount">S/ {{ totalVentas.toFixed(2) }}</div>
+      </div>
+      
+      <div class="summary-card promedio">
+        <h3>📈 Promedio Diario</h3>
+        <div class="amount">S/ {{ promedioVentasDiarias.toFixed(2) }}</div>
+      </div>
+      
+      <div class="summary-card dias">
+        <h3>📅 Días Analizados</h3>
+        <div class="amount">{{ diasAnalisis }}</div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="graficos-container">
+    <div class="grafico-box">
+      <h2>Ventas por Día</h2>
+      <div class="canvas-container">
+        <canvas #ventasChart></canvas>
+      </div>
+    </div>
+    
+    <div class="grafico-box">
+      <h2>Top 10 Platos Más Vendidos</h2>
+      <div class="canvas-container">
+        <canvas #platosChart></canvas>
+      </div>
+    </div>
+  </div>
+  
+  <div class="tablas-container">
+    <div class="tabla-box">
+      <h2>Detalle de Ventas por Día</h2>
+      <table class="tabla-datos">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Total (S/.)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of ventasPorDia">
+            <td>{{ item.fecha | date:'dd/MM/yyyy' }}</td>
+            <td>S/ {{ item.total.toFixed(2) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="tabla-box">
+      <h2>Detalle de Platos Más Vendidos</h2>
+      <table class="tabla-datos">
+        <thead>
+          <tr>
+            <th>Plato</th>
+            <th>Cantidad</th>
+            <th>Total (S/.)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of platosMasVendidos">
+            <td>{{ item.nombre }}</td>
+            <td>{{ item.cantidad }}</td>
+            <td>S/ {{ item.total.toFixed(2) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

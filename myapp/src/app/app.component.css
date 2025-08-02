@@ -1,0 +1,11 @@
+/* Estilos globales de la aplicación */
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+/* Estilos para el modo oscuro */
+:host-context(.dark-mode) {
+  background-color: #121212;
+  color: #e0e0e0;
+}
