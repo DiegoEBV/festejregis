@@ -6,7 +6,7 @@
     "start": "ng serve",
     "build": "ng build",
     "build:prod": "ng build --configuration production",
-    "deploy": "ng build --configuration production --base-href /myapp/ && npx angular-cli-ghpages --dir=dist/myapp",
+    "deploy": "ng build --configuration production --base-href /festejregis/ && npx angular-cli-ghpages --dir=dist/myapp",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },
