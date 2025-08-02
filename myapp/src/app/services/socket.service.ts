@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 declare const io: any;
 
@@ -8,7 +9,7 @@ declare const io: any;
 })
 export class SocketService {
   private socket: any;
-  private serverUrl = 'https://fetregapi.onrender.com'; // Servidor Socket.IO local
+  private serverUrl = environment.socketUrl; // Servidor Socket.IO configurado por entorno
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectInterval = 3000;
