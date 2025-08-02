@@ -8,12 +8,12 @@ export class AuthService {
   private currentUserSubject: BehaviorSubject<any>;
   public currentUser: Observable<any>;
 
-  // Usuarios predefinidos del sistema
-  private users = [
-    { id: 1, nombre: 'Cajero', rol: 'cajero', password: 'cajero123' },
-    { id: 2, nombre: 'Mozo', rol: 'mozo', password: 'mozo123' },
-    { id: 3, nombre: 'Cocina', rol: 'cocina', password: 'cocina123' }
-  ];
+  // Claves simples como en el sistema original
+  private claves = {
+    caja: '123',
+    moso: '456',
+    cocina: '789'
+  };
 
   constructor() {
     // Intentar recuperar usuario de localStorage al iniciar
@@ -28,17 +28,17 @@ export class AuthService {
   }
 
   // Iniciar sesión
-  login(rol: string, password: string): boolean {
-    const user = this.users.find(u => u.rol === rol && u.password === password);
-    
-    if (user) {
-      // Almacenar usuario en localStorage y actualizar el BehaviorSubject
-      const userInfo = { id: user.id, nombre: user.nombre, rol: user.rol };
+  login(tipo: 'caja' | 'moso' | 'cocina', clave: string, nombre?: string): boolean {
+    if (this.claves[tipo] === clave) {
+      const userInfo = { 
+        tipo, 
+        nombre: nombre || tipo, 
+        autenticado: true 
+      };
       localStorage.setItem('currentUser', JSON.stringify(userInfo));
       this.currentUserSubject.next(userInfo);
       return true;
     }
-    
     return false;
   }
 
@@ -51,26 +51,41 @@ export class AuthService {
 
   // Verificar si el usuario está autenticado
   isAuthenticated(): boolean {
-    return !!this.currentUserValue;
+    const usuario = this.currentUserValue;
+    return usuario?.autenticado || false;
   }
 
   // Verificar si el usuario tiene un rol específico
-  hasRole(role: string): boolean {
-    return this.isAuthenticated() && this.currentUserValue.rol === role;
+  hasRole(role: 'caja' | 'moso' | 'cocina'): boolean {
+    const usuario = this.currentUserValue;
+    return usuario?.tipo === role || false;
   }
 
-  // Verificar si el usuario es cajero
-  isCajero(): boolean {
-    return this.hasRole('cajero');
+  // Métodos específicos para cada rol
+  isCaja(): boolean {
+    return this.hasRole('caja');
   }
 
-  // Verificar si el usuario es mozo
-  isMozo(): boolean {
-    return this.hasRole('mozo');
+  // Verificar si es mozo
+  isMoso(): boolean {
+    return this.hasRole('moso');
   }
 
-  // Verificar si el usuario es cocina
+  // Verificar si es cocina
   isCocina(): boolean {
+    return this.hasRole('cocina');
+  }
+
+  // Métodos de acceso
+  canAccessCaja(): boolean {
+    return this.hasRole('caja');
+  }
+
+  canAccessMoso(): boolean {
+    return this.hasRole('moso') || this.hasRole('caja');
+  }
+
+  canAccessCocina(): boolean {
     return this.hasRole('cocina');
   }
 }

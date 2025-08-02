@@ -1,8 +1,9 @@
 import { Component, OnInit } from '@angular/core';
-import { SwUpdate } from '@angular/service-worker';
+// import { SwUpdate } from '@angular/service-worker';
 
 @Component({
   selector: 'app-root',
+  standalone: false,
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
@@ -10,17 +11,17 @@ export class AppComponent implements OnInit {
   title = 'Sistema de Registro Pedidos - FESTEJOS';
   deferredPrompt: any;
   
-  constructor(private swUpdate: SwUpdate) {}
+  constructor() {}
   
   ngOnInit(): void {
     // Verificar actualizaciones del Service Worker
-    if (this.swUpdate.isEnabled) {
-      this.swUpdate.versionUpdates.subscribe(() => {
-        if (confirm('Hay una nueva versión disponible. ¿Desea cargarla?')) {
-          window.location.reload();
-        }
-      });
-    }
+    // if (this.swUpdate.isEnabled) {
+    //   this.swUpdate.versionUpdates.subscribe(() => {
+    //     if (confirm('Hay una nueva versión disponible. ¿Desea cargarla?')) {
+    //       window.location.reload();
+    //     }
+    //   });
+    // }
     
     // Escuchar evento de instalación de PWA
     window.addEventListener('beforeinstallprompt', (e) => {

@@ -44,6 +44,18 @@ export class DexieService extends Dexie {
   }
 
   async agregarProducto(producto: any) {
+    // Verificar si ya existe un producto con el mismo nombre y categoría
+    const existente = await this.productos
+      .where('nombre')
+      .equals(producto.nombre)
+      .and(p => p.categoria === producto.categoria)
+      .first();
+    
+    if (existente) {
+      console.log(`Producto ya existe: ${producto.nombre} en categoría ${producto.categoria}`);
+      return existente.id; // Retornar el ID del producto existente
+    }
+    
     return await this.productos.add(producto);
   }
 
@@ -85,6 +97,22 @@ export class DexieService extends Dexie {
     return await this.pedidos.where('idMesa').equals(idMesa).toArray();
   }
 
+  async getPedidosPorFecha(fecha: string) {
+    return await this.pedidos.where('fecha').equals(fecha).toArray();
+  }
+
+  async getPedidosPagados() {
+    return await this.pedidos.where('estado').equals('pagado').toArray();
+  }
+
+  async getPedidoPorId(id: number) {
+    return await this.pedidos.get(id);
+  }
+
+  async getPedidoEspecialPorId(id: number) {
+    return await this.pedidosEspeciales.get(id);
+  }
+
   async agregarPedido(pedido: any) {
     return await this.pedidos.add(pedido);
   }
@@ -95,6 +123,54 @@ export class DexieService extends Dexie {
 
   async eliminarPedido(id: number) {
     return await this.pedidos.delete(id);
+  }
+
+  async abonarPedido(id: number, abono: number, tipoPago: string) {
+    const pedido = await this.pedidos.get(id);
+    if (pedido) {
+      const nuevoPagado = (pedido.pagado || 0) + abono;
+      const nuevoEstado = nuevoPagado >= pedido.monto ? 'pagado' : 'parcial';
+      
+      // Crear el nuevo abono
+      const nuevoAbono = {
+        monto: abono,
+        tipo_pago: tipoPago,
+        fecha: new Date().toISOString()
+      };
+      
+      // Agregar el abono al array de abonos del pedido
+      const abonosActuales = pedido.abonos || [];
+      abonosActuales.push(nuevoAbono);
+      
+      await this.pedidos.update(id, {
+        pagado: nuevoPagado,
+        estado: nuevoEstado,
+        metodoPago: tipoPago,
+        abonos: abonosActuales
+      });
+      
+      // Agregar al historial de pagos con la estructura correcta
+      const historialData = {
+        pedidoId: id,
+        tipo: pedido.tipo || 'mesa',
+        numero: pedido.mesa,
+        total: abono,
+        metodoPago: tipoPago,
+        fecha: new Date().toISOString(),
+        items: pedido.productos || []
+      };
+      
+      console.log('DEBUG - Guardando en historial:', historialData);
+      await this.agregarHistorialPago(historialData);
+      console.log('DEBUG - Historial guardado exitosamente');
+    }
+  }
+
+  async anularPedido(id: number) {
+    return await this.pedidos.update(id, {
+      estado: 'anulado',
+      fechaAnulacion: new Date().toISOString()
+    });
   }
 
   // Métodos para pedidos especiales (para llevar, delivery)
@@ -114,8 +190,53 @@ export class DexieService extends Dexie {
     return await this.pedidosEspeciales.update(id, pedido);
   }
 
+  async abonarPedidoEspecial(id: number, abono: number, tipoPago: string) {
+    const pedido = await this.pedidosEspeciales.get(id);
+    if (pedido) {
+      const nuevoPagado = (pedido.pagado || 0) + abono;
+      const nuevoEstado = nuevoPagado >= pedido.monto ? 'pagado' : 'parcial';
+      
+      // Crear el nuevo abono
+      const nuevoAbono = {
+        monto: abono,
+        tipo_pago: tipoPago,
+        fecha: new Date().toISOString()
+      };
+      
+      // Agregar el abono al array de abonos del pedido
+      const abonosActuales = pedido.abonos || [];
+      abonosActuales.push(nuevoAbono);
+      
+      await this.pedidosEspeciales.update(id, {
+        pagado: nuevoPagado,
+        estado: nuevoEstado,
+        metodoPago: tipoPago,
+        abonos: abonosActuales
+      });
+      
+      // Agregar al historial de pagos con la estructura correcta
+      const historialDataEspecial = {
+        pedidoId: id,
+        tipo: pedido.tipo,
+        numero: pedido.cliente,
+        total: abono,
+        metodoPago: tipoPago,
+        fecha: new Date().toISOString(),
+        items: []
+      };
+      
+      console.log('DEBUG - Guardando pedido especial en historial:', historialDataEspecial);
+       await this.agregarHistorialPago(historialDataEspecial);
+       console.log('DEBUG - Pedido especial guardado exitosamente en historial');
+    }
+  }
+  
   async eliminarPedidoEspecial(id: number) {
     return await this.pedidosEspeciales.delete(id);
+  }
+
+  async anularPedidoEspecial(id: number) {
+    return await this.pedidosEspeciales.update(id, { estado: 'anulado' });
   }
 
   // Métodos para historial de pagos
@@ -157,6 +278,26 @@ export class DexieService extends Dexie {
 
   async actualizarCaja(id: number, caja: any) {
     return await this.caja.update(id, caja);
+  }
+
+  async getTotalesPorMetodoPago() {
+    const hoy = new Date().toISOString().split('T')[0];
+    const pedidosPagados = await this.pedidos.where('fecha').equals(hoy).and(p => p.estado === 'pagado').toArray();
+    const pedidosEspecialesPagados = await this.pedidosEspeciales.where('fecha').equals(hoy).and(p => p.estado === 'pagado').toArray();
+    
+    let efectivo = 0, yape = 0, tarjeta = 0;
+    
+    [...pedidosPagados, ...pedidosEspecialesPagados].forEach(pedido => {
+      if (pedido.metodoPago === 'efectivo') {
+        efectivo += pedido.total || 0;
+      } else if (pedido.metodoPago === 'yape') {
+        yape += pedido.total || 0;
+      } else if (pedido.metodoPago === 'tarjeta') {
+        tarjeta += pedido.total || 0;
+      }
+    });
+    
+    return { efectivo, yape, tarjeta };
   }
 
   // Métodos para exportar/importar base de datos

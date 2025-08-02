@@ -1,72 +1,134 @@
-<button id="menuButton" class="menu-button">☰</button>
-<nav id="sideMenu" class="side-menu">
-  <ul>
-    <li><a routerLink="/">Inicio</a></li>
-    <li><a routerLink="/catalogo">Catálogo</a></li>
-    <li><a routerLink="/historial">Historial</a></li>
-    <li><a routerLink="/productividad">Productividad</a></li>
-  </ul>
-</nav>
-<div class="container">
-  <div class="header">
-    <h1>🍽️ Sistema de Registro Pedidos - FESTEJOS</h1>
-    <button id="toggleDarkMode" title="Modo oscuro" style="position:fixed;top:16px;left:50px;z-index:8500;" class="btn-secondary">🌙</button>
-    <button id="installBtn" style="display:none;position:fixed;top:16px;left:110px;z-index:8500;" class="btn-secondary">⬇️ Instalar</button>
-    <div class="date-info">
-      <span>{{ fechaActual }}</span>
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-container">
+    <!-- Logo/Brand -->
+    <div class="navbar-brand">
+      <span class="brand-icon">🍽️</span>
+      <span class="brand-text">FESTEJOS</span>
+    </div>
+    
+    <!-- Desktop Menu -->
+    <div class="navbar-menu">
+      <a routerLink="/" class="navbar-item">Inicio</a>
+      <a routerLink="/catalogo" class="navbar-item" *ngIf="authService.isCaja()">Catálogo</a>
+      <a routerLink="/historial" class="navbar-item" *ngIf="authService.isCaja()">Historial</a>
+      <a routerLink="/productividad" class="navbar-item" *ngIf="authService.isCaja()">Productividad</a>
+    </div>
+    
+    <!-- Right side controls -->
+    <div class="navbar-controls">
+      <span class="date-display">{{ fechaActual }}</span>
+      <button id="toggleDarkMode" class="control-btn dark-mode-btn" title="Modo oscuro">🌙</button>
+      <button class="control-btn user-btn" title="Cambiar usuario" (click)="logout()">👤</button>
+      <button id="installBtn" class="control-btn install-btn" style="display:none" title="Instalar app">⬇️</button>
+      
+      <!-- Mobile menu button -->
+      <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
     </div>
   </div>
+  
+  <!-- Mobile Menu -->
+  <div class="mobile-menu" id="mobileMenu">
+    <a routerLink="/" class="mobile-menu-item">Inicio</a>
+    <a routerLink="/catalogo" class="mobile-menu-item" *ngIf="authService.isCaja()">Catálogo</a>
+    <a routerLink="/historial" class="mobile-menu-item" *ngIf="authService.isCaja()">Historial</a>
+    <a routerLink="/productividad" class="mobile-menu-item" *ngIf="authService.isCaja()">Productividad</a>
+  </div>
+</nav>
+
+<div class="main-container">
   <div id="loadingMessage" class="loading" *ngIf="!authService.isAuthenticated()">Inicializando base de datos...</div>
   <div id="mainApp" *ngIf="authService.isAuthenticated() && !authService.isCocina()">
-    <div class="form-section" *ngIf="authService.isCajero()">
-      <h2>💰 Configuración Inicial</h2>
+    <div class="form-section" *ngIf="authService.isCaja()">
+      <h2 style="font-size: 1.5rem;">💰 CONFIGURACIÓN INICIAL</h2>
       <div class="form-group">
         <label for="cajaApertura">Caja de Apertura (S/.):</label>
         <input type="number" id="cajaApertura" [(ngModel)]="cajaApertura" placeholder="0.00" step="0.01">
       </div>
       <button class="btn" id="btnCajaApertura" (click)="establecerCajaApertura(cajaApertura)">Establecer Caja de Apertura</button>
     </div>
-    <h2 style="margin-top:25px; text-align:center;">🪑 MESAS</h2>
-    <div class="mesas-y-especiales">
+    <!-- Sección de Mesas -->
+    <div class="mesas-section">
+      <h2 style="margin-top:25px; text-align:center;">🪑 MESAS</h2>
       <div class="mesas-grid" id="mesasGrid">
-        <!-- Aquí se cargarán las mesas dinámicamente -->
-      </div>
-      <div class="pedido-especial-box" *ngIf="authService.isCajero()" id="boxParaLlevar">
-        <button class="btn-pedido-especial" id="btnParaLlevar">
-          🛍️<br>Para Llevar
+        <button *ngFor="let mesa of mesas" 
+                class="mesa-btn"
+                [ngClass]="{
+                  'mesa-libre': mesa.estado === MESA_ESTADOS.LIBRE && !mesa.dividida,
+                  'mesa-ocupada': mesa.estado === MESA_ESTADOS.OCUPADA && !mesa.dividida,
+                  'mesa-parcial': mesa.estado === MESA_ESTADOS.PARCIAL && !mesa.dividida,
+                  'mesa-libre mesa-dividida': mesa.estado === MESA_ESTADOS.LIBRE && mesa.dividida,
+                  'mesa-ocupada mesa-dividida': mesa.estado === MESA_ESTADOS.OCUPADA && mesa.dividida,
+                  'mesa-parcial mesa-dividida': mesa.estado === MESA_ESTADOS.PARCIAL && mesa.dividida
+                }"
+                (click)="clickMesa(mesa)"
+                (contextmenu)="mostrarOpcionesMesa(mesa, $event)">
+          <div class="mesa-num">M{{ typeof mesa.numero === 'string' ? mesa.numero : mesa.numero.toString().padStart(2, '0') }}</div>
+          <span *ngIf="mesa.estado !== MESA_ESTADOS.LIBRE" class="mesa-monto">
+            S/ {{ mesa.monto.toFixed(2) }}<br>
+            <span *ngIf="mesa.pagado > 0" style="font-size:0.9em">Pagado: S/ {{ mesa.pagado.toFixed(2) }}</span>
+          </span>
         </button>
-        <table class="tabla-pedidos-especiales" id="tablaParaLlevar">
-          <thead>
-            <tr><th>Nombre</th><th>Monto</th><th>Acción</th></tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let pedido of pedidosParaLlevar">
-              <td>{{ pedido.nombre }}</td>
-              <td>S/ {{ pedido.total.toFixed(2) }}</td>
-              <td><button class="btn-small">Ver</button></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="pedido-especial-box" *ngIf="authService.isCajero()" id="boxDelivery">
-        <button class="btn-pedido-especial" id="btnDelivery">
-          🏍️<br>Delivery
-        </button>
-        <table class="tabla-pedidos-especiales" id="tablaDelivery">
-          <thead>
-            <tr><th>Nombre</th><th>Monto</th><th>Acción</th></tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let pedido of pedidosDelivery">
-              <td>{{ pedido.nombre }}</td>
-              <td>S/ {{ pedido.total.toFixed(2) }}</td>
-              <td><button class="btn-small">Ver</button></td>
-            </tr>
-          </tbody>
-        </table>
       </div>
     </div>
-    <div class="stats-grid" *ngIf="authService.isCajero()">
+
+    <!-- Sección de Pedidos Especiales -->
+    <div class="pedidos-especiales-section" *ngIf="authService.isCaja()">
+      <h2 style="text-align:center; margin: 20px 0 20px 0;">🛍️ PEDIDOS ESPECIALES</h2>
+      <div class="pedidos-especiales-grid">
+        <div class="pedido-especial-box" id="boxParaLlevar">
+          <button class="btn-pedido-especial" id="btnParaLlevar" (click)="crearPedidoParaLlevar()">
+            🛍️<br>Para Llevar
+          </button>
+          <table class="tabla-pedidos-especiales" id="tablaParaLlevar">
+            <thead>
+              <tr><th>Nombre</th><th>Monto</th><th>Estado</th><th>Acción</th></tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let pedido of pedidosParaLlevar">
+                <td>{{ pedido.cliente }}</td>
+                <td>S/ {{ pedido.monto.toFixed(2) }}</td>
+                <td>
+                  <span *ngIf="pedido.estado === 'pendiente'" class="estado-pendiente">Pendiente</span>
+                  <span *ngIf="pedido.estado === 'parcial'" class="estado-parcial">Parcial</span>
+                  <span *ngIf="pedido.estado === 'pagado'" class="estado-pagado">Pagado</span>
+                </td>
+                <td>
+                  <button *ngIf="pedido.estado !== 'pagado'" class="btn-small" (click)="pagarPedidoEspecial(pedido)">Pagar</button>
+                  <button *ngIf="pedido.estado === 'pagado'" class="btn-small" disabled>Completado</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pedido-especial-box" id="boxDelivery">
+          <button class="btn-pedido-especial" id="btnDelivery" (click)="crearPedidoDelivery()">
+            🏍️<br>Delivery
+          </button>
+          <table class="tabla-pedidos-especiales" id="tablaDelivery">
+            <thead>
+              <tr><th>Nombre</th><th>Monto</th><th>Estado</th><th>Acción</th></tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let pedido of pedidosDelivery">
+                <td>{{ pedido.cliente }}</td>
+                <td>S/ {{ pedido.monto.toFixed(2) }}</td>
+                <td>
+                  <span *ngIf="pedido.estado === 'pendiente'" class="estado-pendiente">Pendiente</span>
+                  <span *ngIf="pedido.estado === 'parcial'" class="estado-parcial">Parcial</span>
+                  <span *ngIf="pedido.estado === 'pagado'" class="estado-pagado">Pagado</span>
+                </td>
+                <td>
+                  <button *ngIf="pedido.estado !== 'pagado'" class="btn-small" (click)="pagarPedidoEspecial(pedido)">Pagar</button>
+                  <button *ngIf="pedido.estado === 'pagado'" class="btn-small" disabled>Completado</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="stats-grid" *ngIf="authService.isCaja()">
       <div class="summary-cards">
         <div class="summary-card efectivo">
           <h3>💵 Efectivo</h3>
@@ -91,14 +153,13 @@
       </div>
     </div>
   </div>
-  <button id="btnCambiarUsuario" style="position:fixed;top:22px;right:28px;z-index:8000;" class="btn-secondary" *ngIf="authService.isAuthenticated()" (click)="logout()">Cambiar usuario</button>
-</div>
+
 <div id="mesaModal" style="display:none; position:fixed; z-index:3000; left:0; top:0; width:100vw; height:100vh; background:rgba(0,0,0,0.27); align-items:center; justify-content:center;">
   <div id="mesaModalContent" style="background:#fff; padding:30px 24px; border-radius:16px; min-width:310px; min-height:150px; box-shadow:0 8px 40px rgba(0, 0, 0, 0.16);">
   </div>
 </div>
-<div class="resumen-pagados-section" *ngIf="authService.isCajero()">
-  <h2 style="margin:20px 0 10px 0; font-size:1.3em">🧾 Resumen de pedidos pagados</h2>
+<div class="resumen-pagados-section" *ngIf="authService.isCaja()">
+  <h2 style="margin:20px 0 20px 0; font-size:1.8em">🧾 RESUMEN DE PEDIDOS PAGADOS</h2>
   <div id="resumenPagadosTable">
     <table class="tabla-historial">
       <thead>
@@ -116,85 +177,416 @@
           <td>{{ pedido.numero }}</td>
           <td>{{ pedido.fecha | date:'short' }}</td>
           <td>S/ {{ pedido.total.toFixed(2) }}</td>
-          <td>{{ pedido.metodoPago }}</td>
+          <td>
+            <div *ngFor="let detalle of pedido.detallesPagos" style="margin-bottom: 2px;">
+              <span style="font-weight: bold;">{{ detalle.metodo }}:</span> S/ {{ detalle.monto.toFixed(2) }}
+            </div>
+          </td>
         </tr>
       </tbody>
     </table>
   </div>
 </div>
-<div class="reports-section" *ngIf="authService.isCaja()">
-  <h2>📊 Reportes</h2>
-  <div id="resumenCuadros" style="display:flex; margin-bottom: 20px;justify-content: center;" class="summary-cards">
-    <div class="summary-card verde">
-      💵 <b>Efectivo</b><br><span>S/ {{ efectivoTotal.toFixed(2) }}</span>
-    </div>
-    <div class="summary-card morado">
-      📲 <b>Yape</b><br><span>S/ {{ yapeTotal.toFixed(2) }}</span>
-    </div>
-    <div class="summary-card azul">
-      💳 <b>Tarjeta</b><br><span>S/ {{ tarjetaTotal.toFixed(2) }}</span>
-    </div>
-    <div class="summary-card naranja">
-      🧾 <b>Total del Día</b><br><span>S/ {{ totalDia.toFixed(2) }}</span>
-    </div>
-    <div class="summary-card naranja">
-      📊 <b>Ganancia</b><br><span>S/ {{ ganancia.toFixed(2) }}</span>
-    </div>
-  </div>
 
-  <div class="date-filter">
-    <div>
-      <label for="fechaInicio">Fecha Inicio:</label>
-      <input id="fechaInicio" type="date" />
-    </div>
-    <div>
-      <label for="fechaFin">Fecha Fin:</label>
-      <input id="fechaFin" type="date" />
-    </div>
-    <button class="btn-secondary" id="btnGenerarReporte">Generar Reporte</button>
-    <button class="btn-grafica" id="btnGenerarGrafica">Gráfica Platos</button>
-  </div>
-  <div id="tablaReporte"></div>
-  <canvas id="graficaPlatos"></canvas>
-</div>
-<div class="db-actions" *ngIf="authService.isCajero()">
-  <button class="btn-database" (click)="exportarBD()">Exportar BD</button>
-  <button class="btn-database" (click)="fileInput.click()">Importar BD</button>
-  <button class="btn-database" (click)="limpiarBD()">Limpiar BD</button>
-  <input type="file" #fileInput style="display:none;" accept=".json" (change)="importarBD($event)" />
-</div>
-<div *ngIf="authService.isCajero()" style="margin-top:20px;text-align:center;">
-  <a routerLink="/catalogo" class="btn">📋 Administrar catálogo</a>
-</div>
 
-<!-- Modal de Login -->
-<div id="loginModal" *ngIf="showLoginModal" style="position:fixed;z-index:9999;left:0;top:0;width:100vw;height:100vh;background:#fff;display:flex;align-items:center;justify-content:center;">
-  <form (ngSubmit)="login()" style="min-width:280px;padding:28px 24px;border-radius:12px;background:#eee;box-shadow:0 3px 18px #0003;">
-    <h2 style="margin-bottom:14px;text-align:center;">Iniciar sesión</h2>
-    
-    <label for="usuario" style="font-weight:500;">Usuario</label>
-    <select id="usuario" [(ngModel)]="usuario" name="usuario" style="width:100%;margin-bottom:12px;padding:7px;border-radius:8px;">
-      <option value="cajero">Cajero</option>
-      <option value="mozo">Mozo</option>
-      <option value="cocina">Cocina</option>
-    </select>
-    
-    <div *ngIf="usuario === 'mozo'">
-      <label for="nombreMozo" style="font-weight:500;">Nombre del mozo</label>
-      <input type="text" id="nombreMozo" [(ngModel)]="nombreMozo" name="nombreMozo" placeholder="Nombre" style="width:100%;margin-bottom:14px;padding:7px;border-radius:8px;">
-    </div>
-    
-    <label for="clave" style="font-weight:500;">Clave</label>
-    <input type="password" id="clave" [(ngModel)]="clave" name="clave" placeholder="Clave" required style="width:100%;margin-bottom:14px;padding:7px;border-radius:8px;">
-    
-    <button type="submit" class="btn" style="width:100%;margin-bottom:7px;">Entrar</button>
-  </form>
-</div>
+
+
 
 <div id="vistaCocina" *ngIf="authService.isCocina()" style="display:block;max-width:900px;margin:auto;">
   <h2>👨‍🍳 Comandas de cocina</h2>
   <div id="listaComandas"></div>
 </div>
+
+</div> <!-- Cierre del main-container -->
+
+<!-- Modal de Mesa -->
+<div *ngIf="showMesaModal" style="
+    position:fixed; 
+    z-index:3000; 
+    left:0; 
+    top:0; 
+    width:100vw; 
+    height:100vh; 
+    background:rgba(0,0,0,0.27); 
+    display:flex;
+    align-items:center; 
+    justify-content:center;
+">
+  <div style="
+      background:#fff; 
+      padding:30px 24px; 
+      border-radius:16px; 
+      min-width:310px; 
+      min-height:150px; 
+      box-shadow:0 8px 40px rgba(0, 0, 0, 0.16);
+  ">
+    <!-- Modal para mesa libre -->
+    <div *ngIf="modalType === 'libre'">
+      <h3>Mesa {{modalMesa}} (Libre)</h3>
+      <p style="text-align: center; margin-bottom: 1.5rem; color: #666;">¿Cómo deseas registrar el pedido?</p>
+      <div class="modal-buttons four-buttons">
+        <button class="btn" (click)="nuevoPedidoModal(modalMesa, 'platos')">POR PLATOS</button>
+        <button class="btn" (click)="nuevoPedidoModal(modalMesa, 'monto')">SOLO MONTO</button>
+        <button class="btn-secondary" (click)="dividirMesa(modalMesa)">Dividir mesa</button>
+        <button class="btn-cancelar" (click)="closeMesaModal()">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Modal para mesa ocupada -->
+    <div *ngIf="modalType === 'ocupada'">
+      <h3>Mesa {{modalMesa}} ({{modalBaseNum === 0 ? 'Ocupada' : 'Pago parcial'}})</h3>
+      <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+        <div style="margin-bottom: 0.5rem;"><b>Monto Total:</b> S/ {{modalMonto.toFixed(2)}}</div>
+        <div style="margin-bottom: 0.5rem;"><b>Pagado:</b> S/ {{modalPagado.toFixed(2)}}</div>
+        <div style="margin-bottom: 0.5rem;"><b>Detalle de abonos:</b><br>
+          <div *ngIf="modalAbonosStr" [innerHTML]="modalAbonosStr"></div>
+          <i *ngIf="!modalAbonosStr">No hay abonos registrados</i>
+        </div>
+        <div style="font-weight: bold; color: #e74c3c; font-size: 1.1rem;">
+          Saldo pendiente: S/ {{modalSaldoPendiente.toFixed(2)}}
+        </div>
+      </div>
+      
+      <!-- Formulario de abono (solo para caja) -->
+      <form *ngIf="authService.isCaja()" #abonoForm (ngSubmit)="onAbonoSubmit(abonoForm)" autocomplete="off" style="margin-top:8px;">
+        <label>Monto a abonar:<br>
+          <input type="number" [min]="0.01" [max]="modalSaldoPendiente" step="0.01" name="abono" required
+              style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+        </label><br>
+        <label>Medio de Pago:</label>
+        <div style="display: flex; gap: 10px; margin: 10px 0;">
+            <button type="button" class="btn-medio btn-efectivo" [class.selected]="selectedPaymentMethod === 'efectivo'" (click)="selectPaymentMethod('efectivo')">Efectivo</button>
+            <button type="button" class="btn-medio btn-yape" [class.selected]="selectedPaymentMethod === 'yape'" (click)="selectPaymentMethod('yape')">Yape</button>
+            <button type="button" class="btn-medio btn-tarjeta" [class.selected]="selectedPaymentMethod === 'tarjeta'" (click)="selectPaymentMethod('tarjeta')">Tarjeta</button>
+        </div>
+        <input type="hidden" name="tipo_pago" [value]="selectedPaymentMethod" required>
+        <button type="submit" class="btn" style="margin-top:12px;">Abonar</button>
+      </form>
+      
+      <div class="modal-buttons four-buttons" style="margin-top:15px;">
+        <button *ngIf="authService.isCaja()" class="btn-secondary" (click)="anularPedido(modalIdPedido, modalMesa)" [disabled]="!modalIdPedido">Anular pedido</button>
+        <button class="btn-secondary" (click)="mostrarPrecuenta(modalIdPedido)" [disabled]="!modalIdPedido">Solicitar Precuenta</button>
+        <button class="btn-secondary" (click)="editarPedidoModal(modalIdPedido, modalMesa)" [disabled]="!modalIdPedido">Agregar platos</button>
+        <button class="btn-secondary" (click)="closeMesaModal()">Cerrar</button>
+      </div>
+    </div>
+
+    <!-- Modal para dividir mesa -->
+    <div *ngIf="modalType === 'dividir'">
+      <h3>Mesa {{modalMesa}}</h3>
+      <p style="text-align: center; margin-bottom: 1.5rem; color: #666;">¿Deseas dividir esta mesa en 2?</p>
+      <div class="modal-buttons">
+        <button class="btn" (click)="dividirMesa(modalMesa)">Dividir en 2</button>
+        <button class="btn-cancelar" (click)="closeMesaModal()">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Modal para unir mesas -->
+    <div *ngIf="modalType === 'unir'">
+      <h3>Mesa {{modalMesa}} (Dividida)</h3>
+      <p style="text-align: center; margin-bottom: 1.5rem; color: #666;">¿Qué deseas hacer?</p>
+      <div class="modal-buttons four-buttons">
+        <button class="btn" (click)="nuevoPedidoModal(modalMesa, 'platos')">POR PLATOS</button>
+        <button class="btn" (click)="nuevoPedidoModal(modalMesa, 'monto')">SOLO MONTO</button>
+        <button class="btn-secondary" (click)="unirMesa(modalMesa)">Unir mesas</button>
+        <button class="btn-cancelar" (click)="closeMesaModal()">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Modal para seleccionar submesa para platos -->
+    <div *ngIf="modalType === 'selector-submesa-platos'">
+      <h3>Mesa {{modalMesa}} (Dividida)</h3>
+      <p style="text-align: center; margin-bottom: 1.5rem; color: #666;">¿En qué submesa deseas registrar el pedido por platos?</p>
+      <div class="modal-buttons">
+        <button class="btn" (click)="mostrarFormularioPorPlato(modalMesa + 'A')">Mesa {{modalMesa}}A</button>
+        <button class="btn" (click)="mostrarFormularioPorPlato(modalMesa + 'B')">Mesa {{modalMesa}}B</button>
+        <button class="btn-cancelar" (click)="closeMesaModal()">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Modal para seleccionar submesa para monto -->
+    <div *ngIf="modalType === 'selector-submesa-monto'">
+      <h3>Mesa {{modalMesa}} (Dividida)</h3>
+      <p style="text-align: center; margin-bottom: 1.5rem; color: #666;">¿En qué submesa deseas registrar el pedido por monto?</p>
+      <div class="modal-buttons">
+        <button class="btn" (click)="mostrarFormularioPorMonto(modalMesa + 'A')">Mesa {{modalMesa}}A</button>
+        <button class="btn" (click)="mostrarFormularioPorMonto(modalMesa + 'B')">Mesa {{modalMesa}}B</button>
+        <button class="btn-cancelar" (click)="closeMesaModal()">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Formulario para pedido por platos -->
+    <div *ngIf="modalType === 'pedido-platos'">
+      <h3>Nuevo Pedido - Mesa {{modalMesa}}</h3>
+      <h4>Agregar por Platos</h4>
+      
+      <div style="margin-bottom: 15px;">
+        <label for="productoInput">Producto:</label>
+        <div style="position: relative;">
+          <input type="text" id="productoInput" 
+                 [(ngModel)]="productoInput" 
+                 (input)="onProductoInputChange($event.target.value)"
+                 placeholder="Buscar producto..." autocomplete="off"
+                 style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+          
+          <!-- Sugerencias de productos -->
+          <div *ngIf="showSugerencias && sugerenciasProductos.length > 0" 
+               style="position: absolute; width: 100%; background: white; border: 1px solid #ccc; border-top: none; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 1000; max-height: 250px; overflow-y: auto;">
+            <div *ngFor="let producto of sugerenciasProductos" 
+                 class="producto-sugerencia"
+                 (click)="seleccionarProducto(producto)">
+              <div style="font-weight: bold;">{{producto.nombre}}</div>
+              <small style="color: #666;">
+                <span>{{producto.categoria | titlecase}}</span>
+                <span style="color: #28a745; font-weight: 600;">S/ {{producto.precio.toFixed(2)}}</span>
+              </small>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+        <div style="flex: 1;">
+          <label for="cantidadInput">Cantidad:</label>
+          <input type="number" id="cantidadInput" 
+                 [(ngModel)]="cantidadInput" min="1" value="1"
+                 style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+        </div>
+        <div style="flex: 1; display: flex; align-items: end;">
+          <button type="button" class="btn" style="width: 100%;" (click)="agregarPlato()">Agregar</button>
+        </div>
+      </div>
+      
+      <!-- Lista de productos agregados -->
+      <div *ngIf="pedidoDetalle.length > 0" style="margin-bottom: 15px;">
+        <h4>Productos Agregados:</h4>
+        <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; border-radius: 8px;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="background: #f5f5f5;">
+                <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: left;">Producto</th>
+                <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">Cant.</th>
+                <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Precio</th>
+                <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Subtotal</th>
+                <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of pedidoDetalle; let i = index">
+                <td style="padding: 8px; border-bottom: 1px solid #eee;">{{item.nombre}}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">{{item.cantidad}}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">S/ {{item.precio}}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">S/ {{(item.precio * item.cantidad).toFixed(2)}}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">
+                  <button type="button" style="background: #dc3545; color: white; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer;" 
+                          (click)="eliminarProductoPedido(i)">×</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="text-align: right; margin-top: 10px; font-weight: bold; font-size: 1.1em;">
+          Total: S/ {{totalPedido.toFixed(2)}}
+        </div>
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <label for="observacionPedido">Observación:</label>
+        <textarea id="observacionPedido" 
+                  [(ngModel)]="observacionInput" rows="2" 
+                  placeholder="Observaciones del pedido..."
+                  style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc; resize: vertical;"></textarea>
+      </div>
+      
+      <div style="display: flex; gap: 10px;">
+        <button type="button" class="btn" 
+                [disabled]="pedidoDetalle.length === 0"
+                (click)="registrarPedidoPorPlatos(modalMesa)">Registrar Pedido</button>
+        <button type="button" class="btn-secondary" (click)="closeMesaModal()">Cancelar</button>
+      </div>
+    </div>
+    
+    <!-- Formulario para pedido por monto -->
+    <div *ngIf="modalType === 'pedido-monto'">
+      <h3>Nuevo Pedido - Mesa {{modalMesa}}</h3>
+      <h4>Agregar por Monto</h4>
+      
+      <div style="margin-bottom: 15px;">
+        <label for="montoDirecto">Monto Total:</label>
+        <input type="number" id="montoDirecto" 
+               [(ngModel)]="montoDirecto" step="0.01" min="0.01" 
+               placeholder="Ingrese el monto total"
+               style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <label for="observacionMonto">Observación:</label>
+        <textarea id="observacionMonto" 
+                  [(ngModel)]="observacionInput" rows="3" 
+                  placeholder="Descripción del pedido..."
+                  style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc; resize: vertical;"></textarea>
+      </div>
+      
+      <div style="display: flex; gap: 10px;">
+        <button type="button" class="btn" 
+                [disabled]="!montoDirecto || montoDirecto <= 0"
+                (click)="registrarPedidoPorMonto(modalMesa)">Registrar Pedido</button>
+        <button type="button" class="btn-secondary" (click)="closeMesaModal()">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Modal para pedido Para Llevar -->
+    <div *ngIf="modalType === 'para-llevar'">
+      <h3>Nuevo Pedido Para Llevar</h3>
+      
+      <div style="margin-bottom: 15px;">
+        <label for="nombreParaLlevar">Nombre del cliente:</label>
+        <input type="text" id="nombreParaLlevar" 
+               [(ngModel)]="nombreClienteEspecial" 
+               placeholder="Nombre del cliente"
+               style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <label for="montoParaLlevar">Monto total (S/.):</label>
+        <input type="number" id="montoParaLlevar" 
+               [(ngModel)]="montoEspecial" step="0.01" min="0.01" 
+               placeholder="Monto total"
+               style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <label for="observacionParaLlevar">Observación:</label>
+        <textarea id="observacionParaLlevar" 
+                  [(ngModel)]="observacionEspecial" rows="2" 
+                  placeholder="Descripción del pedido (opcional)"
+                  style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc; resize: vertical;"></textarea>
+      </div>
+      
+      <div style="display: flex; gap: 10px;">
+        <button type="button" class="btn" 
+                [disabled]="!nombreClienteEspecial || !montoEspecial || montoEspecial <= 0"
+                (click)="registrarPedidoParaLlevar()">Registrar Pedido</button>
+        <button type="button" class="btn-secondary" (click)="closeMesaModal()">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Modal para pedido Delivery -->
+    <div *ngIf="modalType === 'delivery'">
+      <h3>Nuevo Pedido Delivery</h3>
+      
+      <div style="margin-bottom: 15px;">
+        <label for="nombreDelivery">Nombre del cliente:</label>
+        <input type="text" id="nombreDelivery" 
+               [(ngModel)]="nombreClienteEspecial" 
+               placeholder="Nombre del cliente"
+               style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <label for="direccionDelivery">Dirección:</label>
+        <input type="text" id="direccionDelivery" 
+               [(ngModel)]="direccionEspecial" 
+               placeholder="Dirección de entrega (opcional)"
+               style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <label for="telefonoDelivery">Teléfono:</label>
+        <input type="tel" id="telefonoDelivery" 
+               [(ngModel)]="telefonoEspecial" 
+               placeholder="Teléfono (opcional)"
+               style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <label for="montoDelivery">Monto total (S/.):</label>
+        <input type="number" id="montoDelivery" 
+               [(ngModel)]="montoEspecial" step="0.01" min="0" 
+               placeholder="0"
+               style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <label for="observacionDelivery">Observación:</label>
+        <textarea id="observacionDelivery" 
+                  [(ngModel)]="observacionEspecial" rows="2" 
+                  placeholder="Descripción del pedido (opcional)"
+                  style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc; resize: vertical;"></textarea>
+      </div>
+      
+      <div style="display: flex; gap: 10px;">
+        <button type="button" class="btn" 
+                [disabled]="!nombreClienteEspecial"
+                (click)="registrarPedidoDelivery()">Registrar Pedido</button>
+        <button type="button" class="btn-secondary" (click)="closeMesaModal()">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Modal para pago de pedido especial -->
+    <div *ngIf="modalType === 'pago-especial'">
+      <h3>Pagar {{pedidoEspecialSeleccionado?.tipo === 'llevar' ? 'Para Llevar' : 'Delivery'}}</h3>
+      
+      <div style="margin-bottom: 15px;">
+        <strong>Cliente:</strong> {{pedidoEspecialSeleccionado?.cliente}}<br>
+        <strong>Monto total:</strong> S/ {{pedidoEspecialSeleccionado?.monto?.toFixed(2)}}<br>
+        <strong>Pagado:</strong> S/ {{(pedidoEspecialSeleccionado?.pagado || 0).toFixed(2)}}<br>
+        <strong>Saldo pendiente:</strong> S/ {{(pedidoEspecialSeleccionado?.monto - (pedidoEspecialSeleccionado?.pagado || 0)).toFixed(2)}}
+      </div>
+      
+      <!-- Detalle de abonos si existen -->
+      <div *ngIf="pedidoEspecialSeleccionado?.abonos && pedidoEspecialSeleccionado.abonos.length > 0" 
+           style="margin-top: 15px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
+        <strong>Detalle de Abonos:</strong><br>
+        <div *ngFor="let abono of pedidoEspecialSeleccionado.abonos" 
+              style="font-size:0.97em; color:#444; margin-bottom:2px;">
+           {{abono.tipo_pago.charAt(0).toUpperCase() + abono.tipo_pago.slice(1)}}: S/ {{abono.monto.toFixed(2)}} - {{abono.fecha | date:'short'}}
+         </div>
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <label for="montoAbonoPedidoEspecial">Monto a pagar (S/.):</label>
+        <input type="number" id="montoAbonoPedidoEspecial" 
+               [(ngModel)]="montoAbonoPedidoEspecial" 
+               [min]="0.01" 
+               [max]="pedidoEspecialSeleccionado?.monto - (pedidoEspecialSeleccionado?.pagado || 0)"
+               step="0.01" 
+               placeholder="Monto a pagar"
+               style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <label>Método de pago:</label>
+        <div style="display: flex; gap: 10px; margin: 10px 0;">
+          <button type="button" class="btn-medio btn-efectivo" 
+                  [class.selected]="selectedPaymentMethod === 'efectivo'" 
+                  (click)="selectPaymentMethod('efectivo')">Efectivo</button>
+          <button type="button" class="btn-medio btn-yape" 
+                  [class.selected]="selectedPaymentMethod === 'yape'" 
+                  (click)="selectPaymentMethod('yape')">Yape</button>
+          <button type="button" class="btn-medio btn-tarjeta" 
+                  [class.selected]="selectedPaymentMethod === 'tarjeta'" 
+                  (click)="selectPaymentMethod('tarjeta')">Tarjeta</button>
+        </div>
+      </div>
+      
+      <div style="display: flex; gap: 10px;">
+        <button type="button" class="btn" 
+                [disabled]="!selectedPaymentMethod || montoAbonoPedidoEspecial <= 0"
+                (click)="procesarPagoPedidoEspecial()">Registrar Pago</button>
+        <button type="button" class="btn-secondary" (click)="closeMesaModal()">Cancelar</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal de Login -->
+<app-login-modal 
+  [isVisible]="showLoginModal"
+  (loginSuccess)="onLoginSuccess($event)"
+  (closeModal)="onCloseLoginModal()">
+</app-login-modal>
 
 <div id="alertaPedidoListo" style="
     display:none;
@@ -218,3 +610,5 @@
   </div>
   <button (click)="notificationService.cerrarAlerta()" style="margin-top:10px; background:#fff2; border:none; color:#fff; border-radius:6px; padding:4px 16px; cursor:pointer;">Cerrar</button>
 </div>
+
+```

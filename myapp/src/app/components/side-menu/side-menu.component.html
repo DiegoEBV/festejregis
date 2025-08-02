@@ -21,17 +21,17 @@
         <span class="menu-text">Inicio</span>
       </button>
       
-      <button class="menu-item" (click)="navigateTo('catalogo')" *ngIf="authService.isCajero()">
+      <button class="menu-item" (click)="navigateTo('catalogo')" *ngIf="authService.isCaja()">
         <span class="menu-icon">📋</span>
         <span class="menu-text">Catálogo</span>
       </button>
       
-      <button class="menu-item" (click)="navigateTo('historial')" *ngIf="authService.isCajero()">
+      <button class="menu-item" (click)="navigateTo('historial')" *ngIf="authService.isCaja()">
         <span class="menu-icon">📊</span>
         <span class="menu-text">Historial</span>
       </button>
       
-      <button class="menu-item" (click)="navigateTo('productividad')" *ngIf="authService.isCajero()">
+      <button class="menu-item" (click)="navigateTo('productividad')" *ngIf="authService.isCaja()">
         <span class="menu-icon">📈</span>
         <span class="menu-text">Productividad</span>
       </button>

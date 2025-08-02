@@ -8,14 +8,24 @@ declare const io: any;
 })
 export class SocketService {
   private socket: any;
-  private serverUrl = 'https://festejos-socket-server.onrender.com'; // URL del servidor Socket.IO
+  private serverUrl = 'https://fetregapi.onrender.com'; // Servidor Socket.IO local
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectInterval = 3000;
 
   constructor() {}
 
   // Conectar al servidor de Socket.IO
   connect(userData: any): void {
+    if (this.socket && this.socket.connected) {
+      console.log('Ya existe una conexión activa');
+      return;
+    }
+
     this.socket = io(this.serverUrl, {
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      forceNew: true,
       query: {
         userId: userData.id,
         userName: userData.nombre,
@@ -24,12 +34,51 @@ export class SocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('Conectado al servidor Socket.IO');
+      console.log('✅ Conectado al servidor Socket.IO local');
+      this.reconnectAttempts = 0;
+      
+      // Identificarse automáticamente
+      this.socket.emit('identificarse', userData);
     });
 
     this.socket.on('connect_error', (error: any) => {
-      console.error('Error de conexión Socket.IO:', error);
+      console.warn('⚠️ Error de conexión Socket.IO (usando servidor local):', error.message);
+      this.handleReconnect(userData);
     });
+
+    this.socket.on('disconnect', (reason: string) => {
+      console.log('🔌 Desconectado del servidor Socket.IO:', reason);
+      if (reason === 'io server disconnect') {
+        // Reconectar si el servidor cerró la conexión
+        this.handleReconnect(userData);
+      }
+    });
+
+    this.socket.on('identificado', (data: any) => {
+      console.log('✅ Identificado en el servidor:', data);
+    });
+
+    this.socket.on('server-status', (status: any) => {
+      console.log('📡 Estado del servidor:', status);
+    });
+
+    this.socket.on('error', (error: any) => {
+      console.error('❌ Error en Socket.IO:', error);
+    });
+  }
+
+  // Manejo de reconexión
+  private handleReconnect(userData: any): void {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      console.log(`🔄 Intentando reconectar (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+      
+      setTimeout(() => {
+        this.connect(userData);
+      }, this.reconnectInterval);
+    } else {
+      console.error('❌ Máximo número de intentos de reconexión alcanzado');
+    }
   }
 
   // Desconectar del servidor

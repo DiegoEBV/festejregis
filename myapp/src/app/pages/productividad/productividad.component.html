@@ -2,9 +2,9 @@
 <nav id="sideMenu" class="side-menu">
   <ul>
     <li><a routerLink="/">Inicio</a></li>
-    <li><a routerLink="/catalogo">Catálogo</a></li>
-    <li><a routerLink="/historial">Historial</a></li>
-    <li><a routerLink="/productividad">Productividad</a></li>
+    <li><a routerLink="/catalogo" *ngIf="authService.isCaja()">Catálogo</a></li>
+    <li><a routerLink="/historial" *ngIf="authService.isCaja()">Historial</a></li>
+    <li><a routerLink="/productividad" *ngIf="authService.isCaja()">Productividad</a></li>
   </ul>
 </nav>
 
@@ -29,6 +29,8 @@
       
       <div class="filtro-acciones">
         <button class="btn" (click)="generarReporte()">Generar Reporte</button>
+        <button class="btn-secondary" (click)="establecerFechaHoy()">📅 Hoy</button>
+        <button class="btn-secondary" (click)="establecerUltimaSemana()">📊 Última Semana</button>
         <button class="btn-export" (click)="exportarCSV()" *ngIf="ventasPorDia.length > 0">📊 Exportar CSV</button>
       </div>
     </div>

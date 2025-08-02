@@ -2,9 +2,9 @@
 <nav id="sideMenu" class="side-menu">
   <ul>
     <li><a routerLink="/">Inicio</a></li>
-    <li><a routerLink="/catalogo">Catálogo</a></li>
-    <li><a routerLink="/historial">Historial</a></li>
-    <li><a routerLink="/productividad">Productividad</a></li>
+    <li><a routerLink="/catalogo" *ngIf="authService.isCaja()">Catálogo</a></li>
+    <li><a routerLink="/historial" *ngIf="authService.isCaja()">Historial</a></li>
+    <li><a routerLink="/productividad" *ngIf="authService.isCaja()">Productividad</a></li>
   </ul>
 </nav>
 
@@ -48,8 +48,9 @@
       </div>
       
       <div class="filtro-acciones">
-        <button class="btn" (click)="aplicarFiltros()">Aplicar Filtros</button>
-        <button class="btn-secondary" (click)="limpiarFiltros()">Limpiar</button>
+        <button class="btn" (click)="aplicarFiltros()">🔍 Aplicar Filtros</button>
+        <button class="btn-secondary" (click)="limpiarFiltros()">📅 Hoy</button>
+        <button class="btn-secondary" (click)="mostrarTodosLosDatos()">📊 Todos los Datos</button>
       </div>
     </div>
   </div>
@@ -80,8 +81,12 @@
   
   <div class="historial-container">
     <div class="historial-header">
-      <h2>Resultados ({{ historialPedidos.length }})</h2>
+      <h2>Resultados ({{ historialPedidos.length }}{{ totalRegistrosEnBD > 0 ? ' de ' + totalRegistrosEnBD + ' total' : '' }})</h2>
       <button class="btn-export" (click)="exportarCSV()" *ngIf="historialPedidos.length > 0">📊 Exportar CSV</button>
+    </div>
+    
+    <div class="loading-indicator" *ngIf="cargando">
+      <p>🔄 Cargando historial...</p>
     </div>
     
     <div class="tabla-container" *ngIf="historialPedidos.length > 0">
@@ -111,8 +116,61 @@
       </table>
     </div>
     
-    <div class="no-resultados" *ngIf="historialPedidos.length === 0">
-      <p>No se encontraron resultados para los filtros seleccionados.</p>
+    <div class="no-resultados" *ngIf="historialPedidos.length === 0 && !cargando">
+      <div class="no-resultados-content">
+        <h3 *ngIf="totalRegistrosEnBD === 0">📋 No hay datos en la base de datos</h3>
+        <h3 *ngIf="totalRegistrosEnBD > 0">📋 No hay resultados para los filtros</h3>
+        
+        <p *ngIf="totalRegistrosEnBD === 0">
+          Aún no se han registrado pedidos en el sistema.
+        </p>
+        <p *ngIf="totalRegistrosEnBD > 0">
+          No se encontraron pedidos para los filtros seleccionados.
+          <br><small>Hay {{ totalRegistrosEnBD }} registro(s) total(es) en la base de datos.</small>
+        </p>
+        
+        <div class="sugerencias" *ngIf="totalRegistrosEnBD > 0">
+          <p><strong>Sugerencias:</strong></p>
+          <ul>
+            <li>Verifica que las fechas incluyan el período deseado</li>
+            <li>Intenta ampliar el rango de fechas</li>
+            <li>Revisa que los filtros de tipo y método de pago sean correctos</li>
+            <li>Haz clic en "Mostrar Todos" para ver todos los datos disponibles</li>
+          </ul>
+        </div>
+        
+        <div class="sugerencias" *ngIf="totalRegistrosEnBD === 0">
+          <p><strong>Para empezar:</strong></p>
+          <ul>
+            <li>Ve a la página principal y realiza algunos pedidos</li>
+            <li>Procesa los pagos de los pedidos</li>
+            <li>Los datos aparecerán automáticamente en el historial</li>
+          </ul>
+        </div>
+        
+        <button class="btn" (click)="limpiarFiltros()" *ngIf="totalRegistrosEnBD > 0">🔄 Mostrar Todos los Datos</button>
+        <button class="btn" routerLink="/" *ngIf="totalRegistrosEnBD === 0">🏠 Ir al Inicio</button>
+      </div>
     </div>
+  </div>
+  
+  <!-- Acciones de Base de Datos -->
+  <div class="db-actions" *ngIf="authService.isCaja()">
+    <h3>🗄️ Gestión de Base de Datos</h3>
+    <div class="db-buttons-container">
+      <button class="btn-db btn-export" (click)="exportarBD()">
+        <span class="btn-icon">📤</span>
+        <span class="btn-text">Exportar BD</span>
+      </button>
+      <button class="btn-db btn-import" (click)="fileInput.click()">
+        <span class="btn-icon">📥</span>
+        <span class="btn-text">Importar BD</span>
+      </button>
+      <button class="btn-db btn-clear" (click)="limpiarBD()">
+        <span class="btn-icon">🗑️</span>
+        <span class="btn-text">Limpiar BD</span>
+      </button>
+    </div>
+    <input type="file" #fileInput style="display:none;" accept=".json" (change)="importarBD($event)" />
   </div>
 </div>

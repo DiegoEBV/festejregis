@@ -4,13 +4,13 @@ import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
-import { ServiceWorkerModule } from '@angular/service-worker';
+// import { ServiceWorkerModule } from '@angular/service-worker';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 
 // Pages
-import { HomeComponent } from './pages/home/home.component';
+// import { HomeComponent } from './pages/home/home.component'; // Ahora es standalone
 import { CatalogoComponent } from './pages/catalogo/catalogo.component';
 import { HistorialComponent } from './pages/historial/historial.component';
 import { ProductividadComponent } from './pages/productividad/productividad.component';
@@ -31,7 +31,7 @@ import { CatalogoService } from './services/catalogo.service';
 @NgModule({
   declarations: [
     AppComponent,
-    HomeComponent,
+    // HomeComponent, // Ahora es standalone
     CatalogoComponent,
     HistorialComponent,
     ProductividadComponent,
@@ -44,10 +44,10 @@ import { CatalogoService } from './services/catalogo.service';
     FormsModule,
     HttpClientModule,
     AppRoutingModule,
-    ServiceWorkerModule.register('ngsw-worker.js', {
-      enabled: true,
-      registrationStrategy: 'registerWhenStable:30000'
-    })
+    // ServiceWorkerModule.register('ngsw-worker.js', {
+    //   enabled: true,
+    //   registrationStrategy: 'registerWhenStable:30000'
+    // })
   ],
   providers: [
     DexieService,

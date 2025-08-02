@@ -5,6 +5,7 @@ import { NotificationService } from '../../services/notification.service';
 
 @Component({
   selector: 'app-catalogo',
+  standalone: false,
   templateUrl: './catalogo.component.html',
   styleUrls: ['./catalogo.component.css']
 })
@@ -31,12 +32,12 @@ export class CatalogoComponent implements OnInit {
   constructor(
     public catalogoService: CatalogoService,
     public authService: AuthService,
-    private notificationService: NotificationService
-  ) { }
+    public notificationService: NotificationService
+  ) {}
   
   ngOnInit(): void {
     // Verificar si el usuario está logueado y es cajero
-    if (!this.authService.isAuthenticated() || !this.authService.isCajero()) {
+    if (!this.authService.isAuthenticated() || !this.authService.isCaja()) {
       // Redirigir a la página principal
       window.location.href = '/';
       return;

@@ -4,6 +4,7 @@ import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-side-menu',
+  standalone: false,
   templateUrl: './side-menu.component.html',
   styleUrls: ['./side-menu.component.css']
 })

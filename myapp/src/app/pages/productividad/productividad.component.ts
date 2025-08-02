@@ -6,6 +6,7 @@ import Chart from 'chart.js/auto';
 
 @Component({
   selector: 'app-productividad',
+  standalone: false,
   templateUrl: './productividad.component.html',
   styleUrls: ['./productividad.component.css']
 })
@@ -34,19 +35,17 @@ export class ProductividadComponent implements OnInit, AfterViewInit {
   
   ngOnInit(): void {
     // Verificar si el usuario está logueado y es cajero
-    if (!this.authService.isAuthenticated() || !this.authService.isCajero()) {
+    if (!this.authService.isAuthenticated() || !this.authService.isCaja()) {
       // Redirigir a la página principal
       window.location.href = '/';
       return;
     }
     
-    // Inicializar fechas por defecto (última semana)
+    // Inicializar fechas por defecto (fecha actual)
     const hoy = new Date();
-    const semanaAnterior = new Date();
-    semanaAnterior.setDate(hoy.getDate() - 7);
     
     this.fechaFin = hoy.toISOString().split('T')[0];
-    this.fechaInicio = semanaAnterior.toISOString().split('T')[0];
+    this.fechaInicio = hoy.toISOString().split('T')[0];
     
     // Inicializar el menú lateral
     this.inicializarMenuLateral();
@@ -77,19 +76,41 @@ export class ProductividadComponent implements OnInit, AfterViewInit {
   }
   
   generarReporte(): void {
-    // Convertir fechas a objetos Date para comparación
-    const inicio = new Date(this.fechaInicio);
-    inicio.setHours(0, 0, 0, 0);
+    console.log('DEBUG - Generando reporte con fechas:', { inicio: this.fechaInicio, fin: this.fechaFin });
     
-    const fin = new Date(this.fechaFin);
-    fin.setHours(23, 59, 59, 999);
+    // Convertir fechas a objetos Date para comparación
+    const inicio = new Date(this.fechaInicio + 'T00:00:00.000Z');
+    const fin = new Date(this.fechaFin + 'T23:59:59.999Z');
+    
+    console.log('DEBUG - Rango de fechas convertido:', { 
+      inicioStr: this.fechaInicio, 
+      finStr: this.fechaFin,
+      inicio, 
+      fin 
+    });
     
     this.dexieService.getHistorialPagos().then(historial => {
+      console.log('DEBUG - Historial completo para productividad:', historial);
+      console.log('DEBUG - Cantidad total de registros:', historial.length);
+      
       // Filtrar por fecha
       const historialFiltrado = historial.filter(pedido => {
         const fechaPedido = new Date(pedido.fecha);
-        return fechaPedido >= inicio && fechaPedido <= fin;
+        const enRango = fechaPedido >= inicio && fechaPedido <= fin;
+        if (!enRango) {
+           console.log('DEBUG - Pedido fuera de rango en productividad:', { 
+             pedidoFecha: pedido.fecha, 
+             pedidoFechaObj: new Date(pedido.fecha),
+             inicio, 
+             fin,
+             pedidoData: pedido 
+           });
+         }
+        return enRango;
       });
+      
+      console.log('DEBUG - Historial filtrado para productividad:', historialFiltrado);
+      console.log('DEBUG - Cantidad después de filtro:', historialFiltrado.length);
       
       // Calcular ventas por día
       this.calcularVentasPorDia(historialFiltrado);
@@ -102,27 +123,36 @@ export class ProductividadComponent implements OnInit, AfterViewInit {
       
       // Generar gráficos
       this.generarGraficos();
+    }).catch(error => {
+      console.error('DEBUG - Error al obtener historial de pagos:', error);
     });
   }
   
   calcularVentasPorDia(historial: any[]): void {
     const ventasPorDia: {[key: string]: number} = {};
     
-    // Inicializar todas las fechas en el rango
-    const inicio = new Date(this.fechaInicio);
-    const fin = new Date(this.fechaFin);
+    // Inicializar todas las fechas en el rango usando UTC
+    const inicio = new Date(this.fechaInicio + 'T00:00:00.000Z');
+    const fin = new Date(this.fechaFin + 'T23:59:59.999Z');
     const fechaActual = new Date(inicio);
     
     while (fechaActual <= fin) {
       const fechaStr = fechaActual.toISOString().split('T')[0];
       ventasPorDia[fechaStr] = 0;
-      fechaActual.setDate(fechaActual.getDate() + 1);
+      fechaActual.setUTCDate(fechaActual.getUTCDate() + 1);
     }
     
-    // Sumar ventas por día
+    // Sumar ventas por día usando la fecha original del pedido
     historial.forEach(pedido => {
-      const fechaPedido = new Date(pedido.fecha).toISOString().split('T')[0];
-      ventasPorDia[fechaPedido] = (ventasPorDia[fechaPedido] || 0) + pedido.total;
+      // Extraer solo la fecha del pedido sin conversión de zona horaria
+      const fechaPedidoOriginal = pedido.fecha.split('T')[0];
+      ventasPorDia[fechaPedidoOriginal] = (ventasPorDia[fechaPedidoOriginal] || 0) + pedido.total;
+      
+      console.log('DEBUG - Procesando pedido:', {
+        fechaOriginal: pedido.fecha,
+        fechaExtraida: fechaPedidoOriginal,
+        total: pedido.total
+      });
     });
     
     // Convertir a array para el gráfico
@@ -130,6 +160,8 @@ export class ProductividadComponent implements OnInit, AfterViewInit {
       fecha,
       total
     })).sort((a, b) => a.fecha.localeCompare(b.fecha));
+    
+    console.log('DEBUG - Ventas por día calculadas:', this.ventasPorDia);
   }
   
   calcularPlatosMasVendidos(historial: any[]): void {
@@ -275,6 +307,23 @@ export class ProductividadComponent implements OnInit, AfterViewInit {
     });
   }
   
+  establecerFechaHoy(): void {
+    const hoy = new Date();
+    this.fechaInicio = hoy.toISOString().split('T')[0];
+    this.fechaFin = hoy.toISOString().split('T')[0];
+    this.generarReporte();
+  }
+
+  establecerUltimaSemana(): void {
+    const hoy = new Date();
+    const semanaAnterior = new Date();
+    semanaAnterior.setDate(hoy.getDate() - 7);
+    
+    this.fechaInicio = semanaAnterior.toISOString().split('T')[0];
+    this.fechaFin = hoy.toISOString().split('T')[0];
+    this.generarReporte();
+  }
+
   exportarCSV(): void {
     if (this.ventasPorDia.length === 0) {
       alert('No hay datos para exportar');

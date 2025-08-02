@@ -2,9 +2,9 @@
 <nav id="sideMenu" class="side-menu">
   <ul>
     <li><a routerLink="/">Inicio</a></li>
-    <li><a routerLink="/catalogo">Catálogo</a></li>
-    <li><a routerLink="/historial">Historial</a></li>
-    <li><a routerLink="/productividad">Productividad</a></li>
+    <li><a routerLink="/catalogo" *ngIf="authService.isCaja()">Catálogo</a></li>
+    <li><a routerLink="/historial" *ngIf="authService.isCaja()">Historial</a></li>
+    <li><a routerLink="/productividad" *ngIf="authService.isCaja()">Productividad</a></li>
   </ul>
 </nav>
 
