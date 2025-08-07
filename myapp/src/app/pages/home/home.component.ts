@@ -27,6 +27,11 @@ export class HomeComponent implements OnInit {
   totalDia: number = 0;
   ganancia: number = 0;
   
+  // Variables para cierre automático
+  fechaAnterior: string = '';
+  cierreAutomaticoActivo: boolean = true;
+  ultimaVerificacionCierre: Date = new Date();
+  
   // Variables para reportes
   fechaInicioReporte: string = '';
   fechaFinReporte: string = '';
@@ -99,6 +104,11 @@ export class HomeComponent implements OnInit {
   // Variables para navegación con teclado en autocompletado
   selectedSuggestionIndex: number = -1;
   
+  // Variables para filtros de categoría
+  categoriaSeleccionada: string = 'todos';
+  categorias: any[] = [];
+  productosFiltrados: any[] = [];
+  
   constructor(
     private dexieService: DexieService,
     private socketService: SocketService,
@@ -110,7 +120,9 @@ export class HomeComponent implements OnInit {
   
   ngOnInit(): void {
     this.actualizarFecha();
+    this.inicializarCierreAutomatico();
     setInterval(() => this.actualizarFecha(), 60000); // Actualizar cada minuto
+    setInterval(() => this.verificarCierreAutomatico(), 300000); // Verificar cierre cada 5 minutos
     
     // Inicializar fechas por defecto para reportes
     this.inicializarFechasReporte();
@@ -152,6 +164,13 @@ export class HomeComponent implements OnInit {
       day: 'numeric'
     };
     this.fechaActual = ahora.toLocaleDateString('es-ES', opciones);
+    
+    // Verificar cambio de día para cierre automático
+    const fechaHoyStr = ahora.toISOString().split('T')[0];
+    if (this.fechaAnterior && this.fechaAnterior !== fechaHoyStr) {
+      this.ejecutarCierreAutomatico(this.fechaAnterior);
+    }
+    this.fechaAnterior = fechaHoyStr;
   }
 
   inicializarFechasReporte(): void {
@@ -159,6 +178,99 @@ export class HomeComponent implements OnInit {
     const fechaFormateada = hoy.toISOString().split('T')[0];
     this.fechaInicioReporte = fechaFormateada;
     this.fechaFinReporte = fechaFormateada;
+  }
+  
+  inicializarCierreAutomatico(): void {
+    const hoy = new Date();
+    this.fechaAnterior = hoy.toISOString().split('T')[0];
+    this.ultimaVerificacionCierre = hoy;
+    
+    // Verificar si hay una caja del día anterior que no se cerró
+    this.verificarCierresPendientes();
+  }
+  
+  async verificarCierresPendientes(): Promise<void> {
+    try {
+      const hoy = new Date();
+      const ayer = new Date(hoy);
+      ayer.setDate(ayer.getDate() - 1);
+      const fechaAyer = ayer.toISOString().split('T')[0];
+      
+      // Verificar si la caja de ayer está cerrada
+      const cajaCerrada = await this.dexieService.verificarCajaCerrada(fechaAyer);
+      if (!cajaCerrada) {
+        const cajaAyer = await this.dexieService.getCajaPorFecha(fechaAyer);
+        if (cajaAyer) {
+          console.log('Detectada caja pendiente de cierre:', fechaAyer);
+          await this.ejecutarCierreAutomatico(fechaAyer);
+        }
+      }
+    } catch (error) {
+      console.error('Error al verificar cierres pendientes:', error);
+    }
+  }
+  
+  async verificarCierreAutomatico(): Promise<void> {
+    if (!this.cierreAutomaticoActivo) return;
+    
+    try {
+      const ahora = new Date();
+      const hora = ahora.getHours();
+      
+      // Verificar si es después de las 23:00 (11 PM)
+      if (hora >= 23) {
+        const fechaHoy = ahora.toISOString().split('T')[0];
+        const cajaCerrada = await this.dexieService.verificarCajaCerrada(fechaHoy);
+        
+        if (!cajaCerrada) {
+          console.log('Iniciando cierre automático de caja para:', fechaHoy);
+          await this.ejecutarCierreAutomatico(fechaHoy);
+        }
+      }
+      
+      this.ultimaVerificacionCierre = ahora;
+    } catch (error) {
+      console.error('Error en verificación de cierre automático:', error);
+    }
+  }
+  
+  async ejecutarCierreAutomatico(fecha: string): Promise<void> {
+    try {
+      console.log('Ejecutando cierre automático para la fecha:', fecha);
+      
+      const resultadoCierre = await this.dexieService.cerrarCajaAutomatico(fecha);
+      
+      if (resultadoCierre) {
+        const mensaje = `🔒 CIERRE AUTOMÁTICO DE CAJA\n` +
+                       `Fecha: ${fecha}\n` +
+                       `Total Ventas: S/. ${resultadoCierre.total.toFixed(2)}\n` +
+                       `Efectivo: S/. ${resultadoCierre.efectivo.toFixed(2)}\n` +
+                       `Yape: S/. ${resultadoCierre.yape.toFixed(2)}\n` +
+                       `Tarjeta: S/. ${resultadoCierre.tarjeta.toFixed(2)}\n` +
+                       `Ganancia: S/. ${resultadoCierre.ganancia.toFixed(2)}`;
+        
+        this.notificationService.success('Caja cerrada automáticamente');
+        console.log(mensaje);
+        
+        // Actualizar los totales si es el día actual
+        const hoy = new Date().toISOString().split('T')[0];
+        if (fecha === hoy) {
+          await this.calcularTotales();
+        }
+      } else {
+        console.log('No se pudo cerrar la caja automáticamente para:', fecha);
+      }
+    } catch (error) {
+      console.error('Error al ejecutar cierre automático:', error);
+      this.notificationService.error('Error en el cierre automático de caja');
+    }
+  }
+  
+  toggleCierreAutomatico(): void {
+    this.cierreAutomaticoActivo = !this.cierreAutomaticoActivo;
+    const estado = this.cierreAutomaticoActivo ? 'activado' : 'desactivado';
+    this.notificationService.success(`Cierre automático ${estado}`);
+    console.log(`Cierre automático de caja ${estado}`);
   }
   
   inicializarMenuLateral(): void {
@@ -251,6 +363,10 @@ export class HomeComponent implements OnInit {
         await this.catalogoService.inicializarProductosEjemplo();
         this.catalogoProductos = await this.catalogoService.getProductos();
       }
+      
+      // Cargar categorías
+      this.categorias = this.catalogoService.getCategorias();
+      
       this.catalogoCargado = true;
     } catch (error) {
       console.error('Error al cargar catálogo:', error);
@@ -580,6 +696,28 @@ export class HomeComponent implements OnInit {
     this.mesaModalContent = '';
     this.modalType = '';
     this.selectedPaymentMethod = '';
+    
+    // Limpiar variables del formulario de pedidos para evitar que persistan entre mesas
+    this.pedidoDetalle = [];
+    this.totalPedido = 0;
+    this.productoSeleccionado = null;
+    this.productoInput = '';
+    this.cantidadInput = 1;
+    this.observacionInput = '';
+    this.montoDirecto = 0;
+    this.showSugerencias = false;
+    this.sugerenciasProductos = [];
+    
+    // Resetear modo de edición
+    this.editandoPedido = false;
+    this.idPedidoEditando = null;
+    
+    // Resetear variables de pedidos especiales
+    this.nombreClienteEspecial = '';
+    this.direccionEspecial = '';
+    this.telefonoEspecial = '';
+    this.montoEspecial = 0;
+    this.observacionEspecial = '';
   }
 
   selectPaymentMethod(method: string) {
@@ -606,20 +744,33 @@ export class HomeComponent implements OnInit {
     console.log('Ver pedido:', idPedido);
   }
 
-  mostrarFormularioPorPlato(num: string): void {
+  async mostrarFormularioPorPlato(num: string): Promise<void> {
     console.log('Mostrar formulario por plato para mesa:', num);
     
-    // Resetear variables del pedido (solo si no estamos editando)
-    if (!this.editandoPedido) {
+    // Siempre resetear variables del pedido para evitar que persistan entre mesas
+    // Solo mantener los datos si estamos editando el mismo pedido de la misma mesa
+    const mismaMesaEditando = this.editandoPedido && this.modalMesa === parseInt(num);
+    
+    if (!mismaMesaEditando) {
       this.pedidoDetalle = [];
       this.totalPedido = 0;
+      // Si estamos cambiando de mesa, resetear el modo de edición
+      if (this.modalMesa !== parseInt(num)) {
+        this.editandoPedido = false;
+        this.idPedidoEditando = null;
+      }
     }
+    
     this.productoSeleccionado = null;
     this.productoInput = '';
     this.cantidadInput = 1;
     this.observacionInput = '';
     this.showSugerencias = false;
     this.sugerenciasProductos = [];
+    
+    // Inicializar filtros
+    this.categoriaSeleccionada = 'todos';
+    await this.filtrarProductosPorCategoria();
     
     // Configurar modal Angular
     this.modalType = 'pedido-platos';
@@ -641,6 +792,14 @@ export class HomeComponent implements OnInit {
   }
 
   async abonarPedido(idPedido: number, abono: number, tipoPago: string, monto: number, pagadoActual: number, num: string): Promise<void> {
+    // Validar que el abono no sea mayor al saldo pendiente
+    const saldoPendiente = monto - pagadoActual;
+    
+    if (abono > saldoPendiente) {
+      this.notificationService.error('El monto no puede ser mayor al saldo pendiente');
+      return;
+    }
+    
     try {
       await this.dexieService.abonarPedido(idPedido, abono, tipoPago);
       this.notificationService.success('Abono registrado correctamente');
@@ -660,9 +819,11 @@ export class HomeComponent implements OnInit {
           ).join('');
         }
         
-        // Cerrar modal si está completamente pagado
+        // Si el pago está completo, limpiar la mesa
         if (this.modalSaldoPendiente <= 0) {
+          await this.limpiarMesa(num);
           this.closeMesaModal();
+          this.notificationService.success('Pago completado. Mesa limpiada y lista para nuevos clientes.');
         }
       }
       
@@ -693,7 +854,8 @@ export class HomeComponent implements OnInit {
     if (confirm('¿Está seguro de anular este pedido?')) {
       try {
         await this.dexieService.anularPedido(idPedido);
-        this.notificationService.success('Pedido anulado correctamente');
+        await this.limpiarMesa(num);
+        this.notificationService.success('Pedido anulado correctamente. Mesa limpiada y lista para nuevos clientes.');
         this.closeMesaModal();
         await this.renderMesas();
         await this.calcularTotales();
@@ -701,6 +863,51 @@ export class HomeComponent implements OnInit {
         console.error('Error al anular pedido:', error);
         this.notificationService.error('Error al anular el pedido');
       }
+    }
+  }
+
+  /**
+   * Limpia la mesa eliminando todos los productos seleccionados y reseteando las variables del pedido
+   * @param num Número de la mesa a limpiar
+   */
+  async limpiarMesa(num: string): Promise<void> {
+    try {
+      // Resetear variables del pedido
+      this.pedidoDetalle = [];
+      this.totalPedido = 0;
+      this.productoSeleccionado = null;
+      this.productoInput = '';
+      this.cantidadInput = 1;
+      this.observacionInput = '';
+      this.montoDirecto = 0;
+      this.showSugerencias = false;
+      this.sugerenciasProductos = [];
+      
+      // Resetear variables del modal
+      this.modalMonto = 0;
+      this.modalPagado = 0;
+      this.modalSaldoPendiente = 0;
+      this.modalAbonosStr = '';
+      this.modalIdPedido = null;
+      
+      // Resetear modo de edición si estaba activo
+      this.editandoPedido = false;
+      this.idPedidoEditando = null;
+      
+      // Limpiar elementos del DOM si existen
+      const platosDiv = document.getElementById('platosSeleccionados');
+      if (platosDiv) {
+        platosDiv.innerHTML = '';
+      }
+      
+      const totalSpan = document.getElementById('totalPedido');
+      if (totalSpan) {
+        totalSpan.textContent = '0.00';
+      }
+      
+      console.log(`Mesa ${num} limpiada correctamente`);
+    } catch (error) {
+      console.error('Error al limpiar mesa:', error);
     }
   }
 
@@ -774,55 +981,49 @@ export class HomeComponent implements OnInit {
         this.editandoPedido = true;
         this.idPedidoEditando = idPedido;
         
-        // Determinar si es pedido por platos o monto
-        if (pedido.detalles && pedido.detalles.includes('Plato:')) {
-          this.mostrarFormularioPorPlato(num);
-          
-          // Pre-cargar los platos existentes
-          setTimeout(() => {
-            try {
-              // Si el pedido tiene productos guardados, usarlos directamente
-              if (pedido.productos && Array.isArray(pedido.productos)) {
-                this.pedidoDetalle = pedido.productos.map((producto: { nombre: string; cantidad: number; precio: number }) => ({
-                  nombre: producto.nombre,
-                  cantidad: producto.cantidad,
-                  precio: producto.precio,
-                  observacion: ''
-                }));
-              } else {
-                // Fallback: parsear los detalles con el formato actual
-                const lineas = pedido.detalles.split('\n');
-                this.pedidoDetalle = [];
-                
-                for (const linea of lineas) {
-                  // Formato: "1. Nombre (cantidadx) - S/ precio = S/ subtotal"
-                  const match = linea.match(/\d+\. (.+) \((\d+)x\) - S\/ ([\d.]+) = S\/ [\d.]+/);
-                  if (match) {
-                    this.pedidoDetalle.push({
-                      nombre: match[1],
-                      cantidad: parseInt(match[2]),
-                      precio: parseFloat(match[3]),
-                      observacion: ''
-                    });
-                  }
+        // Siempre mostrar formulario por platos para agregar más productos
+        this.mostrarFormularioPorPlato(num);
+        
+        // Pre-cargar los platos existentes si los hay
+        setTimeout(() => {
+          try {
+            // Si el pedido tiene productos guardados, usarlos directamente
+            if (pedido.productos && Array.isArray(pedido.productos)) {
+              this.pedidoDetalle = pedido.productos.map((producto: { nombre: string; cantidad: number; precio: number }) => ({
+                nombre: producto.nombre,
+                cantidad: producto.cantidad,
+                precio: producto.precio,
+                observacion: ''
+              }));
+            } else if (pedido.detalles && pedido.detalles.includes('Plato:')) {
+              // Fallback: parsear los detalles con el formato actual para pedidos por platos
+              const lineas = pedido.detalles.split('\n');
+              this.pedidoDetalle = [];
+              
+              for (const linea of lineas) {
+                // Formato: "1. Nombre (cantidadx) - S/ precio = S/ subtotal"
+                const match = linea.match(/\d+\. (.+) \((\d+)x\) - S\/ ([\d.]+) = S\/ [\d.]+/);
+                if (match) {
+                  this.pedidoDetalle.push({
+                    nombre: match[1],
+                    cantidad: parseInt(match[2]),
+                    precio: parseFloat(match[3]),
+                    observacion: ''
+                  });
                 }
               }
-              
-              this.calcularTotalPlatos();
-            } catch (error) {
-              console.error('Error al parsear detalles del pedido:', error);
+            } else {
+              // Para pedidos por monto, inicializar vacío para agregar platos
+              this.pedidoDetalle = [];
             }
-          }, 100);
-        } else {
-          this.mostrarFormularioPorMonto(num);
-          
-          // Pre-llenar el monto
-          setTimeout(() => {
-            this.montoDirecto = pedido.monto;
-          }, 100);
-        }
+            
+            this.calcularTotalPlatos();
+          } catch (error) {
+            console.error('Error al parsear detalles del pedido:', error);
+          }
+        }, 100);
         
-        this.notificationService.info('Editando pedido existente - Agregue más platos');
+        this.notificationService.info('Agregando platos al pedido existente');
       } else {
         this.notificationService.error('Pedido no encontrado');
       }
@@ -1243,6 +1444,69 @@ export class HomeComponent implements OnInit {
 
   eliminarProductoPedido(index: number): void {
     this.pedidoDetalle.splice(index, 1);
+    this.calcularTotalPlatos();
+  }
+  
+  // Método para cambiar categoría seleccionada
+  cambiarCategoriaFiltro(categoria: string): void {
+    this.categoriaSeleccionada = categoria;
+    this.filtrarProductosPorCategoria();
+  }
+  
+  // Método para filtrar productos por categoría
+  async filtrarProductosPorCategoria(): Promise<void> {
+    try {
+      if (this.categoriaSeleccionada === 'todos') {
+        this.productosFiltrados = await this.catalogoService.getProductos();
+      } else {
+        this.productosFiltrados = await this.catalogoService.getProductosPorCategoria(this.categoriaSeleccionada);
+      }
+      // Filtrar solo productos disponibles
+      this.productosFiltrados = this.productosFiltrados.filter(p => p.disponible);
+    } catch (error) {
+      console.error('Error al filtrar productos:', error);
+      this.productosFiltrados = [];
+    }
+  }
+  
+  // Método para editar cantidad directamente
+  editarCantidad(index: number, nuevaCantidad: number): void {
+    if (nuevaCantidad > 0) {
+      this.pedidoDetalle[index].cantidad = nuevaCantidad;
+      this.calcularTotalPlatos();
+    }
+  }
+  
+  // Método para aumentar cantidad
+  aumentarCantidad(index: number): void {
+    this.pedidoDetalle[index].cantidad += 1;
+    this.calcularTotalPlatos();
+  }
+  
+  // Método para disminuir cantidad
+  disminuirCantidad(index: number): void {
+    if (this.pedidoDetalle[index].cantidad > 1) {
+      this.pedidoDetalle[index].cantidad -= 1;
+      this.calcularTotalPlatos();
+    }
+  }
+  
+  // Método para agregar producto desde filtros
+  agregarProductoDesdeCategoria(producto: any): void {
+    // Verificar si el producto ya está en el pedido
+    const existente = this.pedidoDetalle.find(p => p.id === producto.id);
+    
+    if (existente) {
+      existente.cantidad += 1;
+      this.notificationService.info(`Cantidad actualizada: ${existente.nombre} (${existente.cantidad})`);
+    } else {
+      this.pedidoDetalle.push({
+        ...producto,
+        cantidad: 1
+      });
+      this.notificationService.success(`Producto agregado: ${producto.nombre}`);
+    }
+    
     this.calcularTotalPlatos();
   }
 
