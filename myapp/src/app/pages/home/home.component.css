@@ -197,6 +197,18 @@
   color: var(--text-primary);
 }
 
+.form-buttons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.form-buttons .btn {
+  flex: 1;
+  min-width: 200px;
+}
+
 input[type="number"], 
 input[type="text"], 
 input[type="password"],
@@ -268,6 +280,28 @@ textarea:focus {
   box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
 }
 
+.btn-success {
+  background: #28a745;
+  color: white;
+}
+
+.btn-success:hover {
+  background: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.btn-warning {
+  background: #ffc107;
+  color: #212529;
+}
+
+.btn-warning:hover {
+  background: #e0a800;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+}
+
 .btn-small {
   background: #4a6fa5;
   color: white;
@@ -281,6 +315,56 @@ textarea:focus {
 
 .btn-small:hover {
   background: #3a5a80;
+}
+
+/* Estilos para botones de categoría */
+.btn-categoria {
+  background: #f8f9fa;
+  color: #495057;
+  border: 1px solid #dee2e6;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.3s;
+}
+
+.btn-categoria:hover {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.btn-categoria-activo {
+  background: #007bff;
+  color: white;
+  border: 1px solid #007bff;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.3s;
+}
+
+.btn-categoria-activo:hover {
+  background: #0056b3;
+  border-color: #0056b3;
+}
+
+/* Estilo para botón pequeño */
+.btn-small {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+
+.btn-small:hover {
+  background: #218838;
 }
 
 .btn-cancelar {

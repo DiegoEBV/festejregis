@@ -45,7 +45,15 @@
         <label for="cajaApertura">Caja de Apertura (S/.):</label>
         <input type="number" id="cajaApertura" [(ngModel)]="cajaApertura" placeholder="0.00" step="0.01">
       </div>
-      <button class="btn" id="btnCajaApertura" (click)="establecerCajaApertura(cajaApertura)">Establecer Caja de Apertura</button>
+      <div class="form-buttons">
+        <button class="btn" id="btnCajaApertura" (click)="establecerCajaApertura(cajaApertura)">Establecer Caja de Apertura</button>
+        <button class="btn" 
+                [ngClass]="{'btn-success': cierreAutomaticoActivo, 'btn-warning': !cierreAutomaticoActivo}"
+                (click)="toggleCierreAutomatico()"
+                title="El cierre automático se ejecuta a las 11:00 PM o al cambiar de día">
+          {{ cierreAutomaticoActivo ? '🔒 Cierre Auto: ON' : '🔓 Cierre Auto: OFF' }}
+        </button>
+      </div>
     </div>
     <!-- Sección de Mesas -->
     <div class="mesas-section">
@@ -251,6 +259,7 @@
       <form *ngIf="authService.isCaja()" #abonoForm (ngSubmit)="onAbonoSubmit(abonoForm)" autocomplete="off" style="margin-top:8px;">
         <label>Monto a abonar:<br>
           <input type="number" [min]="0.01" [max]="modalSaldoPendiente" step="0.01" name="abono" required
+              placeholder="Máximo: S/ {{modalSaldoPendiente.toFixed(2)}}"
               style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
         </label><br>
         <label>Medio de Pago:</label>
@@ -264,7 +273,7 @@
       </form>
       
       <div class="modal-buttons four-buttons" style="margin-top:15px;">
-        <button *ngIf="authService.isCaja()" class="btn-secondary" (click)="anularPedido(modalIdPedido, modalMesa)" [disabled]="!modalIdPedido">Anular pedido</button>
+        <button *ngIf="authService.isCaja() || authService.isMoso()" class="btn-secondary" (click)="anularPedido(modalIdPedido, modalMesa)" [disabled]="!modalIdPedido">Anular pedido</button>
         <button class="btn-secondary" (click)="mostrarPrecuenta(modalIdPedido)" [disabled]="!modalIdPedido">Solicitar Precuenta</button>
         <button class="btn-secondary" (click)="editarPedidoModal(modalIdPedido, modalMesa)" [disabled]="!modalIdPedido">Agregar platos</button>
         <button class="btn-secondary" (click)="closeMesaModal()">Cerrar</button>
@@ -374,7 +383,15 @@
             <tbody>
               <tr *ngFor="let item of pedidoDetalle; let i = index">
                 <td style="padding: 8px; border-bottom: 1px solid #eee;">{{item.nombre}}</td>
-                <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">{{item.cantidad}}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">
+                  <div style="display: flex; align-items: center; justify-content: center; gap: 5px;">
+                    <button type="button" style="background: #6c757d; color: white; border: none; border-radius: 3px; padding: 2px 6px; cursor: pointer; font-size: 12px;" 
+                            (click)="disminuirCantidad(i)" [disabled]="item.cantidad <= 1">-</button>
+                    <span style="min-width: 20px; text-align: center;">{{item.cantidad}}</span>
+                    <button type="button" style="background: #28a745; color: white; border: none; border-radius: 3px; padding: 2px 6px; cursor: pointer; font-size: 12px;" 
+                            (click)="aumentarCantidad(i)">+</button>
+                  </div>
+                </td>
                 <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">S/ {{item.precio}}</td>
                 <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">S/ {{(item.precio * item.cantidad).toFixed(2)}}</td>
                 <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">

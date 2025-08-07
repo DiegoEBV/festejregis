@@ -300,6 +300,75 @@ export class DexieService extends Dexie {
     return { efectivo, yape, tarjeta };
   }
 
+  // Métodos para cierre automático de caja
+  async cerrarCajaAutomatico(fecha: string) {
+    try {
+      // Obtener la caja del día
+      const cajaDelDia = await this.getCajaPorFecha(fecha);
+      if (!cajaDelDia) {
+        console.log('No hay caja para cerrar en la fecha:', fecha);
+        return null;
+      }
+
+      // Calcular totales del día
+      const totales = await this.getTotalesPorMetodoPagoFecha(fecha);
+      const totalVentas = totales.efectivo + totales.yape + totales.tarjeta;
+      const ganancia = totalVentas - (cajaDelDia.montoInicial || 0);
+
+      // Actualizar la caja con el cierre
+      const cierreCaja = {
+        ...cajaDelDia,
+        efectivo: totales.efectivo,
+        yape: totales.yape,
+        tarjeta: totales.tarjeta,
+        total: totalVentas,
+        ganancia: ganancia,
+        fechaCierre: new Date().toISOString(),
+        cerrada: true
+      };
+
+      await this.actualizarCaja(cajaDelDia.id, cierreCaja);
+      
+      console.log('Caja cerrada automáticamente:', {
+        fecha,
+        totalVentas,
+        ganancia,
+        efectivo: totales.efectivo,
+        yape: totales.yape,
+        tarjeta: totales.tarjeta
+      });
+
+      return cierreCaja;
+    } catch (error) {
+      console.error('Error al cerrar caja automáticamente:', error);
+      return null;
+    }
+  }
+
+  async getTotalesPorMetodoPagoFecha(fecha: string) {
+    const pedidosPagados = await this.pedidos.where('fecha').equals(fecha).and(p => p.estado === 'pagado').toArray();
+    const pedidosEspecialesPagados = await this.pedidosEspeciales.where('fecha').equals(fecha).and(p => p.estado === 'pagado').toArray();
+    
+    let efectivo = 0, yape = 0, tarjeta = 0;
+    
+    [...pedidosPagados, ...pedidosEspecialesPagados].forEach(pedido => {
+      if (pedido.metodoPago === 'efectivo') {
+        efectivo += pedido.total || 0;
+      } else if (pedido.metodoPago === 'yape') {
+        yape += pedido.total || 0;
+      } else if (pedido.metodoPago === 'tarjeta') {
+        tarjeta += pedido.total || 0;
+      }
+    });
+    
+    return { efectivo, yape, tarjeta };
+  }
+
+  async verificarCajaCerrada(fecha: string) {
+    const caja = await this.getCajaPorFecha(fecha);
+    return caja ? caja.cerrada === true : false;
+  }
+
   // Métodos para exportar/importar base de datos
   async exportarDB() {
     const data = {
