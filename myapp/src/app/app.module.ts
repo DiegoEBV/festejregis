@@ -13,12 +13,16 @@ import { AppComponent } from './app.component';
 // import { HomeComponent } from './pages/home/home.component'; // Ahora es standalone
 import { CatalogoComponent } from './pages/catalogo/catalogo.component';
 import { HistorialComponent } from './pages/historial/historial.component';
-import { ProductividadComponent } from './pages/productividad/productividad.component';
+// import { ProductividadComponent } from './pages/productividad/productividad.component'; // Ahora es standalone
 
 // Components
 import { NotificationComponent } from './components/notification/notification.component';
 import { SideMenuComponent } from './components/side-menu/side-menu.component';
 import { DarkModeToggleComponent } from './components/dark-mode-toggle/dark-mode-toggle.component';
+// import { SeleccionMesaComponent } from './components/seleccion-mesa/seleccion-mesa.component'; // Ahora es standalone
+// import { PedidoMesaComponent } from './components/pedido-mesa/pedido-mesa.component'; // Ahora es standalone
+
+// import { VistaCocinaComponent } from './components/vista-cocina/vista-cocina.component'; // Eliminado
 
 // Services
 import { DexieService } from './services/dexie.service';
@@ -29,16 +33,21 @@ import { CatalogoService } from './services/catalogo.service';
 import { AutomationService } from './services/automation.service';
 
 
+
 @NgModule({
   declarations: [
     AppComponent,
     // HomeComponent, // Ahora es standalone
     CatalogoComponent,
     HistorialComponent,
-    ProductividadComponent,
+    // ProductividadComponent, // Ahora es standalone
     NotificationComponent,
     SideMenuComponent,
-    DarkModeToggleComponent
+    DarkModeToggleComponent,
+    // SeleccionMesaComponent, // Ahora es standalone
+    // PedidoMesaComponent, // Ahora es standalone
+
+    // VistaCocinaComponent // Eliminado
   ],
   imports: [
     BrowserModule,
@@ -56,7 +65,8 @@ import { AutomationService } from './services/automation.service';
     AuthService,
     NotificationService,
     CatalogoService,
-    AutomationService
+    AutomationService,
+
   ],
   bootstrap: [AppComponent]
 })

@@ -8,11 +8,12 @@ import { NotificationService } from '../../services/notification.service';
 import { CatalogoService } from '../../services/catalogo.service';
 import { DexieService } from '../../services/dexie.service';
 import { LoginModalComponent } from '../../components/login-modal/login-modal.component';
+import { SocketTestComponent } from '../../components/socket-test/socket-test.component';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, LoginModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, LoginModalComponent, SocketTestComponent],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.css']
 })
@@ -157,7 +158,9 @@ export class HomeComponent implements OnInit {
     // Configurar eventos de teclado para autocompletado
     this.configurarEventosTeclado();
     
-
+    // Probar conectividad con el servidor Socket.IO
+    console.log('🔍 Iniciando prueba de conectividad desde HomeComponent...');
+    this.socketService.testConnectivity();
   }
   
 
@@ -348,13 +351,13 @@ export class HomeComponent implements OnInit {
     // Configurar eventos de teclado para autocompletado
     this.configurarEventosTeclado();
     
-    // Conectar socket si es necesario
-    if (this.authService.isCaja() || this.authService.isMoso() || this.authService.isCocina()) {
-      this.socketService.connect(this.authService.currentUserValue);
-      this.configurarEventosSocket();
-    }
+    // Conectar socket para todos los usuarios autenticados
+    this.socketService.connect(this.authService.currentUserValue);
+    this.configurarEventosSocket();
+    this.configurarEventosSocketMesas();
     
-    // No es necesario solicitar permisos de notificación ya que el servicio no tiene este método
+    // Configurar reconexión automática
+    this.configurarReconexionSocket();
   }
   
   async cargarCatalogoProductos(): Promise<void> {
@@ -1785,7 +1788,53 @@ export class HomeComponent implements OnInit {
     });
   }
   
+  // Variables para manejo de reconexión y heartbeat
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 10;
+  private reconnectDelay = 1000; // Inicial: 1 segundo
+  private heartbeatInterval: any;
+  private eventQueue: any[] = []; // Cola de eventos offline
+  private isOnline = true;
+
   configurarEventosSocket(): void {
+    // Eventos de conexión
+    this.socketService.listen('connect').subscribe(() => {
+      console.log('Conectado al servidor Socket.IO');
+      this.notificationService.success('Conectado al servidor');
+      this.isOnline = true;
+      this.reconnectAttempts = 0;
+      this.reconnectDelay = 1000;
+      this.iniciarHeartbeat();
+      this.procesarColaEventos();
+    });
+    
+    this.socketService.listen('disconnect').subscribe(() => {
+      console.log('Desconectado del servidor Socket.IO');
+      this.notificationService.warning('Desconectado del servidor');
+      this.isOnline = false;
+      if (this.heartbeatInterval) {
+        clearInterval(this.heartbeatInterval);
+      }
+      this.reconectarConBackoff();
+    });
+
+    // Eventos de heartbeat
+    this.socketService.listen('pong').subscribe(() => {
+      console.log('Heartbeat recibido del servidor');
+    });
+
+    // Eventos de sincronización de inventario
+    this.socketService.listen('inventarioActualizado').subscribe((inventario) => {
+      console.log('Inventario actualizado:', inventario);
+      this.sincronizarInventario(inventario);
+    });
+
+    this.socketService.listen('productoActualizado').subscribe((producto) => {
+      console.log('Producto actualizado:', producto);
+      this.sincronizarInventario({ productos: [producto] });
+    });
+    
+    // Eventos para caja
     if (this.authService.isCaja()) {
       this.socketService.listen('nuevoPedido').subscribe((pedido) => {
         if (pedido.tipo === 'llevar' || pedido.tipo === 'delivery') {
@@ -1794,7 +1843,7 @@ export class HomeComponent implements OnInit {
           );
         } else {
           this.notificationService.success(
-            `Nuevo pedido recibido - Mesa ${pedido.mesa} - ${pedido.items.length} items`
+            `Nuevo pedido recibido - Mesa ${pedido.mesa} - ${pedido.items?.length || 0} items`
           );
         }
         this.sincronizarDatos();
@@ -1826,8 +1875,28 @@ export class HomeComponent implements OnInit {
         );
         this.sincronizarDatos();
       });
+      
+      this.socketService.listen('pedidoListo').subscribe((pedido) => {
+        this.notificationService.success(
+          `Pedido listo para entrega - Mesa ${pedido.mesa}`
+        );
+        this.mostrarAlertaVisualPedidoListo();
+        this.sincronizarDatos();
+      });
+
+      // Eventos de cambios en caja en tiempo real
+      this.socketService.listen('cajaActualizada').subscribe((caja) => {
+        console.log('Caja actualizada:', caja);
+        this.actualizarTotalCaja(caja);
+      });
+
+      this.socketService.listen('totalDiaActualizado').subscribe((total) => {
+        console.log('Total del día actualizado:', total);
+        this.totalDia = total;
+      });
     }
     
+    // Eventos para mozo
     if (this.authService.isMoso()) {
       this.socketService.listen('respuestaCaja').subscribe((respuesta) => {
         this.notificationService.info(
@@ -1835,16 +1904,60 @@ export class HomeComponent implements OnInit {
         );
         this.sincronizarDatos();
       });
-    }
-    
-    if (this.authService.isCocina()) {
-      this.socketService.listen('pedidoRecibido').subscribe((pedido) => {
-        this.notificationService.info(
-          `Nuevo pedido para cocina - Mesa ${pedido.mesa} - ${pedido.items.length} items`
+      
+      this.socketService.listen('pedidoAprobado').subscribe((pedido) => {
+        this.notificationService.success(
+          `Pedido aprobado - Mesa ${pedido.mesa}`
         );
         this.sincronizarDatos();
       });
     }
+    
+    // Eventos para cocina
+    if (this.authService.isCocina()) {
+      this.socketService.listen('pedidoRecibido').subscribe((pedido) => {
+        this.notificationService.info(
+          `Nuevo pedido para cocina - Mesa ${pedido.mesa} - ${pedido.items?.length || 0} items`
+        );
+        this.reproducirSonidoNuevoPedido();
+        this.sincronizarDatos();
+      });
+      
+      this.socketService.listen('pedidoCancelado').subscribe((pedido) => {
+        this.notificationService.warning(
+          `Pedido cancelado - Mesa ${pedido.mesa}`
+        );
+        this.sincronizarDatos();
+      });
+
+      // Eventos de estado de cocina
+      this.socketService.listen('estadoCocinaActualizado').subscribe((estado) => {
+        console.log('Estado de cocina actualizado:', estado);
+        this.actualizarEstadoCocina(estado);
+      });
+
+      this.socketService.listen('tiempoPreparacionActualizado').subscribe((tiempo) => {
+        console.log('Tiempo de preparación actualizado:', tiempo);
+        this.actualizarEstadoCocina({ tiempoPreparacion: tiempo });
+      });
+
+      this.socketService.listen('pedidoEnPreparacion').subscribe((pedido) => {
+        this.notificationService.info(
+          `Pedido en preparación - Mesa ${pedido.mesa} - Tiempo estimado: ${pedido.tiempoEstimado} min`
+        );
+      });
+    }
+    
+    // Eventos generales para todos los usuarios
+    this.socketService.listen('estadoMesaActualizado').subscribe((mesa) => {
+      console.log('Estado de mesa actualizado:', mesa);
+      this.actualizarEstadoMesa(mesa);
+    });
+    
+    this.socketService.listen('sincronizarDatos').subscribe(() => {
+      console.log('Solicitud de sincronización recibida');
+      this.sincronizarDatos();
+    });
   }
   
   exportarBD(): void {
@@ -2141,5 +2254,191 @@ export class HomeComponent implements OnInit {
     this.notificationService.info('Funcionalidad de gráficas en desarrollo');
   }
 
+  // Funciones para Socket.IO mejorado
+  configurarEventosSocketMesas(): void {
+    // Escuchar cambios en el estado de las mesas
+    this.socketService.on('estadoMesaActualizado', (data: any) => {
+      this.actualizarEstadoMesa(data);
+    });
+
+    // Escuchar pedidos activos en mesas
+    this.socketService.on('pedidosActivosEnMesas', (data: any) => {
+      this.actualizarPedidosEnMesas(data);
+    });
+  }
+
+  configurarReconexionSocket(): void {
+    // Reconexión automática cada 30 segundos si se pierde la conexión
+    setInterval(() => {
+      if (!this.socketService.isConnected()) {
+        console.log('Intentando reconectar Socket.IO...');
+        this.socketService.connect({ usuario: this.usuarioActual?.nombre || 'Usuario' });
+      }
+    }, 30000);
+  }
+
+  actualizarEstadoMesa(data: any): void {
+    if (data && data.numeroMesa && this.mesas[data.numeroMesa - 1]) {
+      this.mesas[data.numeroMesa - 1].estado = data.estado;
+      this.mesas[data.numeroMesa - 1].pedidoActivo = data.pedidoActivo;
+      this.cdr.detectChanges();
+    }
+  }
+
+  actualizarMesasDesdeServidor(): void {
+    // Solicitar estado actualizado de todas las mesas
+    this.socketService.emit('solicitarEstadoMesas', {
+      restaurante: 'principal',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  actualizarPedidosEnMesas(data: any): void {
+    if (data && Array.isArray(data.pedidos)) {
+      data.pedidos.forEach((pedido: any) => {
+        if (pedido.numeroMesa && this.mesas[pedido.numeroMesa - 1]) {
+          this.mesas[pedido.numeroMesa - 1].pedidoActivo = pedido;
+        }
+      });
+      this.cdr.detectChanges();
+    }
+  }
+
+  // Métodos auxiliares para Socket.IO mejorado
+  iniciarHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+    }
+    
+    this.heartbeatInterval = setInterval(() => {
+      if (this.socketService.isConnected()) {
+        this.socketService.emit('ping', { timestamp: Date.now() });
+      }
+    }, 30000); // Ping cada 30 segundos
+  }
+
+  reconectarConBackoff(): void {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.log('Máximo número de intentos de reconexión alcanzado');
+      this.mostrarAlertaConexion(false);
+      return;
+    }
+
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    this.reconnectDelay = delay;
+    this.reconnectAttempts++;
+
+    console.log(`Reintentando conexión en ${delay}ms (intento ${this.reconnectAttempts})`);
+    
+    setTimeout(() => {
+      this.socketService.connect({ usuario: this.usuarioActual?.nombre || 'Usuario' });
+    }, delay);
+  }
+
+  procesarColaEventos(): void {
+    if (this.eventQueue.length === 0) return;
+
+    console.log(`Procesando ${this.eventQueue.length} eventos en cola`);
+    
+    const eventos = [...this.eventQueue];
+    this.eventQueue = [];
+
+    eventos.forEach(evento => {
+      try {
+        this.socketService.emit(evento.tipo, evento.data);
+      } catch (error) {
+        console.error('Error al procesar evento en cola:', error);
+        // Volver a agregar a la cola si falla
+        this.eventQueue.push(evento);
+      }
+    });
+  }
+
+  mostrarAlertaConexion(conectado: boolean): void {
+    if (conectado) {
+      this.notificationService.success('Conexión Socket.IO establecida');
+    } else {
+      this.notificationService.warning('Conexión Socket.IO perdida. Reintentando...');
+    }
+  }
+
+  sincronizarInventario(data: any): void {
+    try {
+      if (data && data.productos) {
+        // Actualizar catálogo de productos
+        this.catalogoProductos = data.productos;
+        this.cdr.detectChanges();
+        console.log('Inventario sincronizado desde servidor');
+      }
+    } catch (error) {
+      console.error('Error al sincronizar inventario:', error);
+    }
+  }
+
+  actualizarTotalCaja(data: any): void {
+    try {
+      if (data) {
+        if (data.efectivoTotal !== undefined) {
+          this.efectivoTotal = data.efectivoTotal;
+        }
+        if (data.totalDia !== undefined) {
+          this.totalDia = data.totalDia;
+        }
+        this.cdr.detectChanges();
+        console.log('Totales de caja actualizados en tiempo real');
+      }
+    } catch (error) {
+      console.error('Error al actualizar totales de caja:', error);
+    }
+  }
+
+  actualizarEstadoCocina(data: any): void {
+    try {
+      if (data) {
+        // Actualizar estado de cocina y tiempos de preparación
+        if (data.estadoCocina) {
+          console.log('Estado de cocina actualizado:', data.estadoCocina);
+        }
+        if (data.tiempoPreparacion) {
+          console.log('Tiempo de preparación actualizado:', data.tiempoPreparacion);
+        }
+        if (data.pedidoId && data.estado) {
+          // Actualizar estado específico de un pedido
+          console.log(`Pedido ${data.pedidoId} cambió a estado: ${data.estado}`);
+        }
+        this.cdr.detectChanges();
+      }
+    } catch (error) {
+      console.error('Error al actualizar estado de cocina:', error);
+    }
+  }
+
+  // Métodos para notificaciones sonoras
+  reproducirSonidoPedidoListo(): void {
+    try {
+      const audio = new Audio('assets/sounds/pedido-listo.mp3');
+      audio.play().catch(error => {
+        console.log('No se pudo reproducir sonido de pedido listo:', error);
+      });
+    } catch (error) {
+      console.log('Error al reproducir sonido:', error);
+    }
+  }
+
+  reproducirSonidoNuevoPedido(): void {
+    try {
+      const audio = new Audio('assets/sounds/nuevo-pedido.mp3');
+      audio.play().catch(error => {
+        console.log('No se pudo reproducir sonido de nuevo pedido:', error);
+      });
+    } catch (error) {
+      console.log('Error al reproducir sonido:', error);
+    }
+  }
+
+  mostrarAlertaVisualPedidoListo(): void {
+    // Mostrar alerta visual para pedido listo
+    this.notificationService.info('¡Pedido listo para entregar!');
+  }
 
 }

@@ -88,4 +88,9 @@ export class AuthService {
   canAccessCocina(): boolean {
     return this.hasRole('cocina');
   }
+
+  // Método para obtener el usuario actual (compatibilidad)
+  getUsuarioActual(): any {
+    return this.currentUserValue;
+  }
 }

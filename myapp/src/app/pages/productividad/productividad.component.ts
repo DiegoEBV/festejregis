@@ -1,4 +1,6 @@
 import { Component, OnInit, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { CommonModule, DatePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { DexieService } from '../../services/dexie.service';
 import { AuthService } from '../../services/auth.service';
 import { CatalogoService } from '../../services/catalogo.service';
@@ -6,7 +8,9 @@ import Chart from 'chart.js/auto';
 
 @Component({
   selector: 'app-productividad',
-  standalone: false,
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  providers: [DatePipe],
   templateUrl: './productividad.component.html',
   styleUrls: ['./productividad.component.css']
 })
