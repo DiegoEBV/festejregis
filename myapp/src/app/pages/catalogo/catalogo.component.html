@@ -14,6 +14,56 @@
     <button routerLink="/" class="btn-back">Volver al Inicio</button>
   </div>
   
+  <!-- Sección de Automatización -->
+  <div class="automation-section">
+    <h2>🤖 AUTOMATIZACIÓN</h2>
+    <div class="automation-grid">
+      <!-- Backup Automático -->
+      <div class="automation-card">
+        <div class="automation-icon">💾</div>
+        <h3>Backup Automático</h3>
+        <p>Respaldo diario de la base de datos a las 11:00 PM</p>
+        <button 
+          class="automation-toggle" 
+          [class.active]="backupAutomaticoActivo"
+          (click)="toggleBackupAutomatico()">
+          💾 Backup: {{ backupAutomaticoActivo ? 'ON' : 'OFF' }}
+        </button>
+        <button class="automation-manual" (click)="ejecutarBackupManual()">🔧 Manual</button>
+      </div>
+      
+      <!-- Sincronización en la Nube -->
+      <div class="automation-card">
+        <div class="automation-icon">☁️</div>
+        <h3>Sincronización en la Nube</h3>
+        <p>Acceso desde múltiples dispositivos</p>
+        <button 
+          class="automation-toggle" 
+          [class.active]="sincronizacionNubeActiva"
+          (click)="toggleSincronizacionNube()">
+          ☁️ Sync: {{ sincronizacionNubeActiva ? 'ON' : 'OFF' }}
+        </button>
+        <button class="automation-manual" (click)="ejecutarSincronizacionManual()">🔧 Manual</button>
+      </div>
+      
+      <!-- Impresión Automática -->
+      <div class="automation-card">
+        <div class="automation-icon">🖨️</div>
+        <h3>Impresión Automática</h3>
+        <p>Tickets a cocina sin intervención manual</p>
+        <button 
+          class="automation-toggle" 
+          [class.active]="impresionAutomaticaActiva"
+          (click)="toggleImpresionAutomatica()">
+          🖨️ Print: {{ impresionAutomaticaActiva ? 'ON' : 'OFF' }}
+        </button>
+        <div class="automation-status" *ngIf="impresionAutomaticaActiva">
+          Los tickets se envían automáticamente a cocina
+        </div>
+      </div>
+    </div>
+  </div>
+  
   <div class="catalogo-container">
     <div class="categorias-sidebar">
       <h2>Categorías</h2>
