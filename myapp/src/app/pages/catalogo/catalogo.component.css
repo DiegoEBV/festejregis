@@ -289,6 +289,118 @@ input[type="number"] {
   color: #e0e0e0;
 }
 
+/* Estilos para la sección de automatización */
+.automation-section {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 25px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.automation-section h2 {
+  text-align: center;
+  color: #2c3e50;
+  margin-bottom: 25px;
+  font-size: 1.5rem;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 10px;
+}
+
+.automation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.automation-card {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.automation-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.automation-icon {
+  font-size: 2rem;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.automation-card h3 {
+  color: #2c3e50;
+  margin: 0 0 10px 0;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.automation-card p {
+  color: #7f8c8d;
+  margin: 0 0 15px 0;
+  font-size: 0.9rem;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.automation-toggle {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-bottom: 10px;
+}
+
+.automation-toggle:not(.active) {
+  background: #e74c3c;
+  color: white;
+}
+
+.automation-toggle.active {
+  background: #27ae60;
+  color: white;
+}
+
+.automation-toggle:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.automation-manual {
+  width: 100%;
+  padding: 8px;
+  background: #6c7b7f;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.automation-manual:hover {
+  background: #5a6c70;
+}
+
+.automation-status {
+  background: #d4edda;
+  color: #155724;
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  text-align: center;
+  margin-top: 10px;
+  border: 1px solid #c3e6cb;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .catalogo-container {
@@ -296,10 +408,24 @@ input[type="number"] {
   }
   
   .categorias-sidebar {
-    max-width: 100%;
+    max-width: none;
   }
   
   .productos-grid {
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: 1fr;
+  }
+  
+  .header {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+  
+  .automation-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .automation-section {
+    padding: 15px;
   }
 }

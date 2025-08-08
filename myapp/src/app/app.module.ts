@@ -26,6 +26,7 @@ import { SocketService } from './services/socket.service';
 import { AuthService } from './services/auth.service';
 import { NotificationService } from './services/notification.service';
 import { CatalogoService } from './services/catalogo.service';
+import { AutomationService } from './services/automation.service';
 
 
 @NgModule({
@@ -54,7 +55,8 @@ import { CatalogoService } from './services/catalogo.service';
     SocketService,
     AuthService,
     NotificationService,
-    CatalogoService
+    CatalogoService,
+    AutomationService
   ],
   bootstrap: [AppComponent]
 })

@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CatalogoService } from '../../services/catalogo.service';
 import { AuthService } from '../../services/auth.service';
 import { NotificationService } from '../../services/notification.service';
+import { AutomationService } from '../../services/automation.service';
 
 @Component({
   selector: 'app-catalogo',
@@ -29,10 +30,17 @@ export class CatalogoComponent implements OnInit {
     precio: 0
   };
   
+  // Variables para automatización
+  backupAutomaticoActivo: boolean = true;
+  sincronizacionNubeActiva: boolean = false;
+  impresionAutomaticaActiva: boolean = true;
+  estadoAutomation: any = {};
+  
   constructor(
     public catalogoService: CatalogoService,
     public authService: AuthService,
-    public notificationService: NotificationService
+    public notificationService: NotificationService,
+    private automationService: AutomationService
   ) {}
   
   ngOnInit(): void {
@@ -48,6 +56,9 @@ export class CatalogoComponent implements OnInit {
     
     // Inicializar el menú lateral
     this.inicializarMenuLateral();
+    
+    // Inicializar servicios de automatización
+    this.inicializarAutomation();
   }
   
   inicializarMenuLateral(): void {
@@ -74,8 +85,24 @@ export class CatalogoComponent implements OnInit {
   
   // Método para cargar los productos de la categoría seleccionada
   cargarProductos(): void {
+    console.log(`🔍 Cargando productos para categoría: ${this.categoriaSeleccionada}`);
     this.catalogoService.getProductosPorCategoria(this.categoriaSeleccionada).then(result => {
-      this.productos = result;
+      console.log(`📦 Productos obtenidos:`, result);
+      
+      // Verificar duplicados
+      const nombres = result.map(p => p.nombre);
+      const duplicados = nombres.filter((nombre, index) => nombres.indexOf(nombre) !== index);
+      if (duplicados.length > 0) {
+        console.warn(`⚠️ Productos duplicados encontrados:`, duplicados);
+      }
+      
+      // Filtrar duplicados basándose en nombre y categoría
+      const productosUnicos = result.filter((producto, index, array) => 
+        array.findIndex(p => p.nombre === producto.nombre && p.categoria === producto.categoria) === index
+      );
+      
+      console.log(`✅ Productos únicos después del filtro:`, productosUnicos);
+      this.productos = productosUnicos;
     });
   }
   
@@ -152,5 +179,45 @@ export class CatalogoComponent implements OnInit {
   
   cancelarEdicion(): void {
     this.productoSeleccionado = null;
+  }
+  
+  // ========== MÉTODOS DE AUTOMATIZACIÓN ==========
+  
+  inicializarAutomation(): void {
+    // Suscribirse a los estados del AutomationService
+    this.automationService.isBackupEnabled.subscribe((enabled: boolean) => {
+      this.backupAutomaticoActivo = enabled;
+    });
+    
+    this.automationService.isCloudSyncEnabled.subscribe((enabled: boolean) => {
+      this.sincronizacionNubeActiva = enabled;
+    });
+    
+    this.automationService.isAutoPrintEnabled.subscribe((enabled: boolean) => {
+      this.impresionAutomaticaActiva = enabled;
+    });
+    
+    // Obtener estado inicial
+    this.estadoAutomation = this.automationService.getBackupStatus();
+  }
+  
+  toggleBackupAutomatico(): void {
+    this.automationService.toggleBackup(!this.backupAutomaticoActivo);
+  }
+  
+  toggleSincronizacionNube(): void {
+    this.automationService.toggleCloudSync(!this.sincronizacionNubeActiva);
+  }
+  
+  toggleImpresionAutomatica(): void {
+    this.automationService.toggleAutoPrint(!this.impresionAutomaticaActiva);
+  }
+  
+  ejecutarBackupManual(): void {
+    this.automationService.performManualBackup();
+  }
+  
+  ejecutarSincronizacionManual(): void {
+    this.automationService.performManualSync();
   }
 }

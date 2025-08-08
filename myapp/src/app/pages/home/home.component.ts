@@ -32,6 +32,8 @@ export class HomeComponent implements OnInit {
   cierreAutomaticoActivo: boolean = true;
   ultimaVerificacionCierre: Date = new Date();
   
+
+  
   // Variables para reportes
   fechaInicioReporte: string = '';
   fechaFinReporte: string = '';
@@ -115,6 +117,7 @@ export class HomeComponent implements OnInit {
     public authService: AuthService,
     public notificationService: NotificationService,
     private catalogoService: CatalogoService,
+
     private cdr: ChangeDetectorRef
   ) {}
   
@@ -153,7 +156,11 @@ export class HomeComponent implements OnInit {
     
     // Configurar eventos de teclado para autocompletado
     this.configurarEventosTeclado();
+    
+
   }
+  
+
   
   actualizarFecha(): void {
     const ahora = new Date();
