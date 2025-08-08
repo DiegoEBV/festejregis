@@ -162,8 +162,13 @@
           <div class="amount">S/ {{ ganancia.toFixed(2) }}</div>
         </div>
       </div>
+    
+    <!-- Componente de prueba Socket.IO -->
+    <div class="socket-test-section" *ngIf="authService.isCaja()">
+      <app-socket-test></app-socket-test>
     </div>
   </div>
+</div>
 
 <div id="mesaModal" style="display:none; position:fixed; z-index:3000; left:0; top:0; width:100vw; height:100vh; background:rgba(0,0,0,0.27); align-items:center; justify-content:center;">
   <div id="mesaModalContent" style="background:#fff; padding:30px 24px; border-radius:16px; min-width:310px; min-height:150px; box-shadow:0 8px 40px rgba(0, 0, 0, 0.16);">

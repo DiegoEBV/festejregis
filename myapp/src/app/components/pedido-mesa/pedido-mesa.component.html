@@ -1,0 +1,299 @@
+<div class="pedido-mesa-container" [class.modo-compacto]="modoCompacto">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-top">
+      <button class="btn-volver" (click)="volverASeleccion()" [disabled]="enviandoPedido">
+        ← Volver
+      </button>
+      
+      <div class="mesa-info">
+        <h1 class="titulo">
+          <span class="icono">🍽️</span>
+          Mesa {{ mesaNumero }}
+        </h1>
+        <div class="estado-mesa" *ngIf="mesa">
+          <span class="estado" [class]="mesa.estado">
+            {{ mesa.estado | titlecase }}
+          </span>
+          <span class="capacidad">👥 {{ mesa.capacidad }}</span>
+        </div>
+      </div>
+      
+      <div class="header-actions">
+        <div class="estado-conexion">
+          <span class="conexion-indicator" [class.conectado]="conectado" [class.desconectado]="!conectado">
+            {{ conectado ? '🟢' : '🔴' }}
+          </span>
+        </div>
+        
+        <button class="btn-carrito" (click)="toggleCarrito()" [class.activo]="mostrarCarrito">
+          🛒
+          <span class="badge" *ngIf="cantidadItems > 0">{{ cantidadItems }}</span>
+        </button>
+        
+        <button class="btn-modo" (click)="toggleModoCompacto()" [class.activo]="modoCompacto">
+          {{ modoCompacto ? '📋' : '🔲' }}
+        </button>
+      </div>
+    </div>
+    
+    <!-- Búsqueda -->
+    <div class="busqueda">
+      <div class="busqueda-input">
+        <span class="icono-busqueda">🔍</span>
+        <input 
+          type="text" 
+          placeholder="Buscar productos..."
+          [(ngModel)]="busqueda"
+          [disabled]="cargando">
+        <button 
+          class="btn-limpiar" 
+          *ngIf="busqueda" 
+          (click)="busqueda = ''"
+          type="button">
+          ✕
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contenido principal -->
+  <div class="contenido-principal" [class.con-carrito]="mostrarCarrito">
+    
+    <!-- Panel de productos -->
+    <div class="panel-productos">
+      
+      <!-- Categorías -->
+      <div class="categorias">
+        <div class="categorias-scroll">
+          <button 
+            *ngFor="let categoria of categorias"
+            class="categoria-btn"
+            [class.activa]="categoriaSeleccionada === categoria.id"
+            (click)="seleccionarCategoria(categoria.id)"
+            [disabled]="cargando">
+            <span class="categoria-icono">{{ categoria.icono }}</span>
+            <span class="categoria-nombre">{{ categoria.nombre }}</span>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Loading -->
+      <div class="loading-productos" *ngIf="cargando">
+        <div class="spinner"></div>
+        <p>Cargando productos...</p>
+      </div>
+      
+      <!-- Grid de productos -->
+      <div class="productos-grid" *ngIf="!cargando">
+        <div 
+          *ngFor="let producto of productosFiltrados"
+          class="producto-card"
+          [class.no-disponible]="!producto.disponible">
+          
+          <!-- Imagen del producto -->
+          <div class="producto-imagen">
+            <img 
+              [src]="producto.imagen || 'https://trae-api-us.mchost.guru/api/ide/v1/text_to_image?prompt=delicious+' + producto.nombre.replace(' ', '+') + '+food+dish+restaurant+style&image_size=square'"
+              [alt]="producto.nombre"
+              loading="lazy">
+            <div class="tiempo-preparacion" *ngIf="producto.tiempoPreparacion">
+              ⏱️ {{ producto.tiempoPreparacion }}min
+            </div>
+          </div>
+          
+          <!-- Información del producto -->
+          <div class="producto-info">
+            <h3 class="producto-nombre">{{ producto.nombre }}</h3>
+            <p class="producto-descripcion" *ngIf="producto.descripcion">
+              {{ producto.descripcion }}
+            </p>
+            <div class="producto-precio">
+              {{ formatearPrecio(producto.precio) }}
+            </div>
+          </div>
+          
+          <!-- Acciones -->
+          <div class="producto-acciones">
+            <button 
+              class="btn-agregar"
+              (click)="agregarProducto(producto)"
+              [disabled]="!producto.disponible || enviandoPedido">
+              <span class="icono">+</span>
+              Agregar
+            </button>
+          </div>
+          
+          <!-- Overlay no disponible -->
+          <div class="overlay-no-disponible" *ngIf="!producto.disponible">
+            <span>No disponible</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Sin productos -->
+      <div class="sin-productos" *ngIf="!cargando && productosFiltrados.length === 0">
+        <div class="sin-productos-content">
+          <span class="icono">🔍</span>
+          <h3>No se encontraron productos</h3>
+          <p *ngIf="busqueda">Intenta con otros términos de búsqueda.</p>
+          <p *ngIf="!busqueda && categoriaSeleccionada !== 'todas'">No hay productos en esta categoría.</p>
+          <button class="btn-limpiar-filtros" (click)="busqueda = ''; categoriaSeleccionada = 'todas'">
+            Limpiar filtros
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Panel del carrito -->
+    <div class="panel-carrito" [class.visible]="mostrarCarrito">
+      <div class="carrito-header">
+        <h2>Pedido Actual</h2>
+        <button class="btn-cerrar-carrito" (click)="toggleCarrito()">
+          ✕
+        </button>
+      </div>
+      
+      <!-- Items del pedido -->
+      <div class="carrito-items">
+        <div *ngIf="pedidoActual.length === 0" class="carrito-vacio">
+          <span class="icono">🛒</span>
+          <p>Tu pedido está vacío</p>
+          <small>Agrega productos para comenzar</small>
+        </div>
+        
+        <div 
+          *ngFor="let item of pedidoActual"
+          class="carrito-item">
+          
+          <div class="item-info">
+            <h4 class="item-nombre">{{ item.nombre }}</h4>
+            <div class="item-precio">{{ formatearPrecio(item.precio) }} c/u</div>
+            <div class="item-notas" *ngIf="item.notas">
+              <small>📝 {{ item.notas }}</small>
+            </div>
+          </div>
+          
+          <div class="item-controles">
+            <div class="cantidad-controles">
+              <button 
+                class="btn-cantidad"
+                (click)="quitarProducto(item.productoId)"
+                [disabled]="enviandoPedido">
+                -
+              </button>
+              <span class="cantidad">{{ item.cantidad }}</span>
+              <button 
+                class="btn-cantidad"
+                (click)="agregarProducto(obtenerProducto(item.productoId)!)"
+                [disabled]="enviandoPedido">
+                +
+              </button>
+            </div>
+            
+            <div class="item-subtotal">
+              {{ formatearPrecio(item.subtotal) }}
+            </div>
+            
+            <button 
+              class="btn-eliminar"
+              (click)="eliminarProducto(item.productoId)"
+              [disabled]="enviandoPedido"
+              title="Eliminar producto">
+              🗑️
+            </button>
+          </div>
+          
+          <!-- Notas del producto -->
+          <div class="item-notas-input">
+            <input 
+              type="text"
+              placeholder="Notas especiales..."
+              [value]="item.notas"
+              (blur)="actualizarNotas(item.productoId, $event.target.value)"
+              [disabled]="enviandoPedido">
+          </div>
+        </div>
+      </div>
+      
+      <!-- Resumen del pedido -->
+      <div class="carrito-resumen" *ngIf="pedidoActual.length > 0">
+        <div class="resumen-linea">
+          <span>Items:</span>
+          <span>{{ cantidadItems }}</span>
+        </div>
+        <div class="resumen-linea" *ngIf="tiempoEstimado > 0">
+          <span>Tiempo estimado:</span>
+          <span>⏱️ {{ tiempoEstimado }}min</span>
+        </div>
+        <div class="resumen-linea total">
+          <span>Total:</span>
+          <span>{{ formatearPrecio(totalPedido) }}</span>
+        </div>
+      </div>
+      
+      <!-- Acciones del carrito -->
+      <div class="carrito-acciones">
+        <button 
+          class="btn-cancelar"
+          (click)="cancelarPedido()"
+          [disabled]="pedidoActual.length === 0 || enviandoPedido">
+          Cancelar
+        </button>
+        
+        <button 
+          class="btn-confirmar"
+          (click)="confirmarPedido()"
+          [disabled]="!puedeConfirmarPedido()"
+          [class.enviando]="enviandoPedido">
+          <span *ngIf="!enviandoPedido">Confirmar Pedido</span>
+          <span *ngIf="enviandoPedido">
+            <span class="spinner-small"></span>
+            Enviando...
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Botón flotante del carrito (móvil) -->
+  <button 
+    class="btn-carrito-flotante"
+    (click)="toggleCarrito()"
+    *ngIf="!mostrarCarrito && cantidadItems > 0">
+    <span class="icono">🛒</span>
+    <span class="badge">{{ cantidadItems }}</span>
+    <span class="total">{{ formatearPrecio(totalPedido) }}</span>
+  </button>
+  
+  <!-- Overlay de carga -->
+  <div class="loading-overlay" *ngIf="enviandoPedido">
+    <div class="loading-content">
+      <div class="spinner"></div>
+      <h3>Enviando pedido...</h3>
+      <p>Por favor espera un momento</p>
+    </div>
+  </div>
+  
+  <!-- Mensaje de error de conexión -->
+  <div class="error-conexion" *ngIf="!conectado">
+    <div class="error-content">
+      <span class="icono">⚠️</span>
+      <h3>Sin conexión</h3>
+      <p>Verifica tu conexión a internet</p>
+      <small>Los pedidos no se pueden enviar sin conexión</small>
+    </div>
+  </div>
+  
+  <!-- Mensaje de mesa no válida -->
+  <div class="error-mesa" *ngIf="!esMesaValida() && !cargando">
+    <div class="error-content">
+      <span class="icono">🚫</span>
+      <h3>Mesa no disponible</h3>
+      <p>Esta mesa no está disponible para pedidos</p>
+      <button class="btn-volver-error" (click)="volverASeleccion()">
+        Seleccionar otra mesa
+      </button>
+    </div>
+  </div>
+</div>

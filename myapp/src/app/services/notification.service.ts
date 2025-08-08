@@ -49,6 +49,15 @@ export class NotificationService {
   warning(message: string, duration: number = 4000): void {
     this.show({ message, type: 'warning', duration });
   }
+
+  // Alias para compatibilidad
+  mostrarExito(message: string, duration: number = 3000): void {
+    this.success(message, duration);
+  }
+
+  mostrarInfo(message: string, duration: number = 3000): void {
+    this.info(message, duration);
+  }
   
   // Cerrar alerta manualmente
   cerrarAlerta(): void {

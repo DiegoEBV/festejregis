@@ -1,0 +1,200 @@
+<div class="seleccion-mesa-container">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-content">
+      <h1 class="titulo">
+        <span class="icono">🍽️</span>
+        Seleccionar Mesa
+      </h1>
+      
+      <div class="estado-conexion">
+        <span class="estado-indicator" [class.conectado]="conectado" [class.desconectado]="!conectado">
+          {{ conectado ? '🟢 Conectado' : '🔴 Desconectado' }}
+        </span>
+      </div>
+    </div>
+    
+    <!-- Información del dispositivo -->
+    <div class="info-dispositivo" *ngIf="dispositivoActual">
+      <span class="dispositivo-tipo">📱 {{ dispositivoActual.tipo | titlecase }}</span>
+      <span class="dispositivo-usuario" *ngIf="dispositivoActual.usuario">
+        👤 {{ dispositivoActual.usuario }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Estadísticas -->
+  <div class="estadisticas">
+    <div class="stat-card">
+      <div class="stat-numero">{{ estadisticas.total }}</div>
+      <div class="stat-label">Total</div>
+    </div>
+    <div class="stat-card libres">
+      <div class="stat-numero">{{ estadisticas.libres }}</div>
+      <div class="stat-label">Libres</div>
+    </div>
+    <div class="stat-card ocupadas">
+      <div class="stat-numero">{{ estadisticas.ocupadas }}</div>
+      <div class="stat-label">Ocupadas</div>
+    </div>
+    <div class="stat-card reservadas" *ngIf="estadisticas.reservadas > 0">
+      <div class="stat-numero">{{ estadisticas.reservadas }}</div>
+      <div class="stat-label">Reservadas</div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filtros">
+    <div class="filtro-grupo">
+      <label>Estado:</label>
+      <div class="filtro-botones">
+        <button 
+          class="filtro-btn" 
+          [class.activo]="filtroEstado === 'todas'"
+          (click)="cambiarFiltroEstado('todas')">
+          Todas
+        </button>
+        <button 
+          class="filtro-btn" 
+          [class.activo]="filtroEstado === 'libres'"
+          (click)="cambiarFiltroEstado('libres')">
+          🟢 Libres
+        </button>
+        <button 
+          class="filtro-btn" 
+          [class.activo]="filtroEstado === 'ocupadas'"
+          (click)="cambiarFiltroEstado('ocupadas')">
+          🔴 Ocupadas
+        </button>
+      </div>
+    </div>
+    
+    <div class="filtro-grupo">
+      <label>Ubicación:</label>
+      <div class="filtro-botones">
+        <button 
+          class="filtro-btn" 
+          [class.activo]="filtroUbicacion === 'todas'"
+          (click)="cambiarFiltroUbicacion('todas')">
+          Todas
+        </button>
+        <button 
+          class="filtro-btn" 
+          [class.activo]="filtroUbicacion === 'Planta Baja'"
+          (click)="cambiarFiltroUbicacion('Planta Baja')">
+          🏢 Planta Baja
+        </button>
+        <button 
+          class="filtro-btn" 
+          [class.activo]="filtroUbicacion === 'Segundo Piso'"
+          (click)="cambiarFiltroUbicacion('Segundo Piso')">
+          🏢 Segundo Piso
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grid de Mesas -->
+  <div class="mesas-grid">
+    <div 
+      *ngFor="let mesa of mesasFiltradas" 
+      [class]="getClaseMesa(mesa)"
+      (click)="puedeSeleccionarMesa(mesa) && seleccionarMesa(mesa)"
+      [class.disabled]="!puedeSeleccionarMesa(mesa) || cargando">
+      
+      <!-- Número de mesa -->
+      <div class="mesa-numero">
+        <span class="numero">{{ mesa.numero }}</span>
+        <span class="icono-estado">{{ getIconoMesa(mesa) }}</span>
+      </div>
+      
+      <!-- Información de la mesa -->
+      <div class="mesa-info">
+        <div class="capacidad">
+          👥 {{ mesa.capacidad }} personas
+        </div>
+        <div class="ubicacion">
+          📍 {{ mesa.ubicacion }}
+        </div>
+        <div class="estado">
+          {{ getTextoEstado(mesa) }}
+        </div>
+      </div>
+      
+      <!-- Información adicional -->
+      <div class="mesa-adicional" *ngIf="getInfoAdicional(mesa)">
+        <small>{{ getInfoAdicional(mesa) }}</small>
+      </div>
+      
+      <!-- Indicador de selección -->
+      <div class="seleccion-indicator" *ngIf="mesaSeleccionada === mesa.numero">
+        ✓ Seleccionada
+      </div>
+      
+      <!-- Overlay para mesas no disponibles -->
+      <div class="mesa-overlay" *ngIf="!puedeSeleccionarMesa(mesa)">
+        <span class="overlay-text">
+          No disponible
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mensaje si no hay mesas -->
+  <div class="no-mesas" *ngIf="mesasFiltradas.length === 0">
+    <div class="no-mesas-content">
+      <span class="icono">🔍</span>
+      <h3>No se encontraron mesas</h3>
+      <p>Intenta cambiar los filtros para ver más opciones.</p>
+      <button class="btn-refrescar" (click)="refrescarMesas()">
+        🔄 Refrescar
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading overlay -->
+  <div class="loading-overlay" *ngIf="cargando">
+    <div class="loading-content">
+      <div class="spinner"></div>
+      <p>Seleccionando mesa...</p>
+    </div>
+  </div>
+
+  <!-- Botones de acción -->
+  <div class="acciones">
+    <button class="btn-refrescar" (click)="refrescarMesas()" [disabled]="cargando">
+      🔄 Refrescar Mesas
+    </button>
+    
+    <button 
+      class="btn-admin" 
+      *ngIf="esAdministrador()" 
+      (click)="irAAdministracion()"
+      [disabled]="cargando">
+      ⚙️ Administración
+    </button>
+  </div>
+
+  <!-- Leyenda -->
+  <div class="leyenda">
+    <h4>Leyenda:</h4>
+    <div class="leyenda-items">
+      <div class="leyenda-item">
+        <span class="icono">🟢</span>
+        <span>Disponible</span>
+      </div>
+      <div class="leyenda-item">
+        <span class="icono">🔴</span>
+        <span>Ocupada (puede agregar pedidos)</span>
+      </div>
+      <div class="leyenda-item">
+        <span class="icono">🟡</span>
+        <span>Reservada</span>
+      </div>
+      <div class="leyenda-item">
+        <span class="icono">🧹</span>
+        <span>En limpieza</span>
+      </div>
+    </div>
+  </div>
+</div>
