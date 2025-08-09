@@ -854,15 +854,15 @@ textarea:focus {
   justify-content: center;
   width: 100px;
   height: 100px;
-  border: 3px solid var(--border-color);
+  border: 3px solid var(--border-color, #ddd);
   border-radius: 16px;
-  background: var(--bg-primary);
+  background-color: var(--bg-primary, #fff);
   cursor: pointer;
   transition: all 0.3s ease;
   padding: 0.6rem;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   aspect-ratio: 1;
 }
 
@@ -888,83 +888,86 @@ textarea:focus {
   line-height: 1.2;
 }
 
-/* Estados de mesa - Estilos uniformes */
-.mesa-libre {
-  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%) !important;
-  border-color: #28a745 !important;
-  color: #155724 !important;
+/* Estados de mesa - Estilos con máxima especificidad */
+.mesa-btn.mesa-libre {
+  background: #a8e6cf !important;
+  border-color: #7dd3a0 !important;
+  color: #2d5a3d !important;
+  box-shadow: 0 2px 6px rgba(168, 230, 207, 0.3) !important;
 }
 
-.mesa-libre .mesa-num {
-  color: #155724 !important;
-}
-
-.mesa-libre .mesa-monto {
-  color: #155724 !important;
-}
-
-.mesa-libre:hover {
-  background: linear-gradient(135deg, #c3e6cb 0%, #b8dcc6 100%) !important;
-  border-color: #1e7e34 !important;
-}
-
-.mesa-ocupada {
-  background: #ff4757 !important;
-  border-color: #ff3742 !important;
-  color: white !important;
-  box-shadow: 0 4px 8px rgba(255, 71, 87, 0.3) !important;
-}
-
-.mesa-ocupada .mesa-num {
-  color: white !important;
+.mesa-btn.mesa-libre .mesa-num {
+  color: #2d5a3d !important;
   font-weight: 900 !important;
 }
 
-.mesa-ocupada .mesa-monto {
-  color: white !important;
+.mesa-btn.mesa-libre .mesa-monto {
+  color: #2d5a3d !important;
 }
 
-.mesa-ocupada:hover {
-  background: #ff3742 !important;
-  border-color: #ff2837 !important;
-  box-shadow: 0 6px 12px rgba(255, 71, 87, 0.4) !important;
+.mesa-btn.mesa-libre:hover {
+  background: #7dd3a0 !important;
+  border-color: #5cb85c !important;
+  box-shadow: 0 4px 10px rgba(168, 230, 207, 0.4) !important;
 }
 
-.mesa-parcial {
-  background: #ffa502 !important;
-  border-color: #ff9500 !important;
-  color: white !important;
-  box-shadow: 0 4px 8px rgba(255, 165, 2, 0.3) !important;
+.mesa-btn.mesa-ocupada {
+  background: #ffb3ba !important;
+  border-color: #ff8a95 !important;
+  color: #8b2635 !important;
+  box-shadow: 0 2px 6px rgba(255, 179, 186, 0.3) !important;
 }
 
-.mesa-parcial .mesa-num {
-  color: white !important;
+.mesa-btn.mesa-ocupada .mesa-num {
+  color: #8b2635 !important;
   font-weight: 900 !important;
 }
 
-.mesa-parcial .mesa-monto {
-  color: white !important;
+.mesa-btn.mesa-ocupada .mesa-monto {
+  color: #8b2635 !important;
 }
 
-.mesa-parcial:hover {
-  background: #ff9500 !important;
-  border-color: #ff8500 !important;
-  box-shadow: 0 6px 12px rgba(255, 165, 2, 0.4) !important;
+.mesa-btn.mesa-ocupada:hover {
+  background: #ff8a95 !important;
+  border-color: #e74c3c !important;
+  box-shadow: 0 4px 10px rgba(255, 179, 186, 0.4) !important;
+}
+
+.mesa-btn.mesa-parcial {
+  background: #ffe4b5 !important;
+  border-color: #ffd280 !important;
+  color: #8b5a00 !important;
+  box-shadow: 0 2px 6px rgba(255, 228, 181, 0.3) !important;
+}
+
+.mesa-btn.mesa-parcial .mesa-num {
+  color: #8b5a00 !important;
+  font-weight: 900 !important;
+}
+
+.mesa-btn.mesa-parcial .mesa-monto {
+  color: #8b5a00 !important;
+}
+
+.mesa-btn.mesa-parcial:hover {
+  background: #ffd280 !important;
+  border-color: #f39c12 !important;
+  box-shadow: 0 4px 10px rgba(255, 228, 181, 0.4) !important;
 }
 
 .mesa-dividida {
   position: relative;
+  border: 2px dashed rgba(108, 117, 125, 0.6) !important;
 }
 
-.mesa-dividida::before {
-  content: '';
+.mesa-dividida::after {
+  content: '✂';
   position: absolute;
-  top: 50%;
-  left: 10%;
-  right: 10%;
-  height: 2px;
-  background: currentColor;
-  opacity: 0.5;
+  top: 4px;
+  right: 4px;
+  font-size: 12px;
+  opacity: 0.7;
+  color: #6c757d;
 }
 
 /* Estilos mejorados para pedidos especiales */

@@ -64,13 +64,12 @@
       <div class="mesas-grid" id="mesasGrid">
         <button *ngFor="let mesa of mesas" 
                 class="mesa-btn"
+                [attr.data-estado]="mesa?.estado"
                 [ngClass]="{
-                  'mesa-libre': mesa.estado === MESA_ESTADOS.LIBRE && !mesa.dividida,
-                  'mesa-ocupada': mesa.estado === MESA_ESTADOS.OCUPADA && !mesa.dividida,
-                  'mesa-parcial': mesa.estado === MESA_ESTADOS.PARCIAL && !mesa.dividida,
-                  'mesa-libre mesa-dividida': mesa.estado === MESA_ESTADOS.LIBRE && mesa.dividida,
-                  'mesa-ocupada mesa-dividida': mesa.estado === MESA_ESTADOS.OCUPADA && mesa.dividida,
-                  'mesa-parcial mesa-dividida': mesa.estado === MESA_ESTADOS.PARCIAL && mesa.dividida
+                  'mesa-libre': mesa.estado === MESA_ESTADOS.LIBRE,
+                  'mesa-ocupada': mesa.estado === MESA_ESTADOS.OCUPADA,
+                  'mesa-parcial': mesa.estado === MESA_ESTADOS.PARCIAL,
+                  'mesa-dividida': !!mesa.dividida
                 }"
                 (click)="clickMesa(mesa)"
                 (contextmenu)="mostrarOpcionesMesa(mesa, $event)">
@@ -163,11 +162,7 @@
         </div>
       </div>
     
-    <!-- Componente de prueba Socket.IO -->
-    <div class="socket-test-section" *ngIf="authService.isCaja()">
-      <app-socket-test></app-socket-test>
-    </div>
-  </div>
+   </div>
 </div>
 
 <div id="mesaModal" style="display:none; position:fixed; z-index:3000; left:0; top:0; width:100vw; height:100vh; background:rgba(0,0,0,0.27); align-items:center; justify-content:center;">
