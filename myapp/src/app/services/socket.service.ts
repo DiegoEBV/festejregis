@@ -6,13 +6,52 @@ declare const io: any;
 
 export interface PedidoMesa {
   id: string;
-  mesa: number;
+  mesa: number | string; // Puede ser número de mesa o string para delivery/llevar
   productos: any[];
   estado: 'pendiente' | 'preparando' | 'listo' | 'entregado' | 'pagado';
   total: number;
   timestamp: Date;
   dispositivo: string;
+  tipo: 'mesa' | 'delivery' | 'llevar';
+  cliente?: {
+    nombre?: string;
+    telefono?: string;
+    direccion?: string;
+  };
 }
+
+export interface PedidoDelivery {
+  id: string;
+  cliente: {
+    nombre: string;
+    telefono: string;
+    direccion: string;
+  };
+  productos: any[];
+  estado: 'pendiente' | 'preparando' | 'listo' | 'en_camino' | 'entregado' | 'pagado';
+  total: number;
+  timestamp: Date;
+  dispositivo: string;
+  tipo: 'delivery';
+  tiempoEstimado?: number;
+}
+
+export interface PedidoLlevar {
+  id: string;
+  cliente: {
+    nombre: string;
+    telefono?: string;
+  };
+  productos: any[];
+  estado: 'pendiente' | 'preparando' | 'listo' | 'retirado' | 'pagado';
+  total: number;
+  timestamp: Date;
+  dispositivo: string;
+  tipo: 'llevar';
+  tiempoEstimado?: number;
+}
+
+export type PedidoGeneral = PedidoMesa | PedidoDelivery | PedidoLlevar;
 
 export interface MesaEstado {
   numero: number;
@@ -38,10 +77,16 @@ export class SocketService {
   private connectionStatus = new BehaviorSubject<boolean>(false);
   private mesasEstado = new BehaviorSubject<MesaEstado[]>([]);
   private pedidosActivos = new BehaviorSubject<PedidoMesa[]>([]);
+  private pedidosDelivery = new BehaviorSubject<PedidoDelivery[]>([]);
+  private pedidosLlevar = new BehaviorSubject<PedidoLlevar[]>([]);
+  private todosPedidos = new BehaviorSubject<PedidoGeneral[]>([]);
   
   public connectionStatus$ = this.connectionStatus.asObservable();
   public mesasEstado$ = this.mesasEstado.asObservable();
   public pedidosActivos$ = this.pedidosActivos.asObservable();
+  public pedidosDelivery$ = this.pedidosDelivery.asObservable();
+  public pedidosLlevar$ = this.pedidosLlevar.asObservable();
+  public todosPedidos$ = this.todosPedidos.asObservable();
 
   constructor() {
     console.log('🔧 Inicializando SocketService con URL:', this.serverUrl);
@@ -79,11 +124,14 @@ export class SocketService {
       // Identificarse automáticamente
       this.socket.emit('identificarse', userData);
       
-      // Configurar listeners específicos para mesas
-      this.setupMesaListeners();
+      // Configurar listeners específicos para todos los tipos de pedidos
+      this.setupAllListeners();
       
-      // Solicitar estado inicial de mesas
+      // Solicitar estado inicial de mesas y pedidos
       this.socket.emit('obtener-estado-mesas');
+      this.socket.emit('obtener-pedidos-estado', { estado: 'pendiente' });
+      this.socket.emit('obtener-pedidos-estado', { estado: 'preparando' });
+      this.socket.emit('obtener-pedidos-estado', { estado: 'listo' });
     });
 
     this.socket.on('connect_error', (error: any) => {
@@ -217,6 +265,26 @@ export class SocketService {
     }
   }
 
+  // Crear nuevo pedido de delivery
+  crearPedidoDelivery(pedido: Omit<PedidoDelivery, 'id' | 'timestamp'>): void {
+    if (this.socket) {
+      this.socket.emit('crear-pedido-delivery', {
+        ...pedido,
+        timestamp: new Date()
+      });
+    }
+  }
+
+  // Crear nuevo pedido para llevar
+  crearPedidoLlevar(pedido: Omit<PedidoLlevar, 'id' | 'timestamp'>): void {
+    if (this.socket) {
+      this.socket.emit('crear-pedido-llevar', {
+        ...pedido,
+        timestamp: new Date()
+      });
+    }
+  }
+
   // Actualizar estado de pedido
   actualizarEstadoPedido(pedidoId: string, nuevoEstado: PedidoMesa['estado']): void {
     if (this.socket) {
@@ -259,28 +327,29 @@ export class SocketService {
   }
 
   // Configurar listeners después de conectar
-  private setupMesaListeners(): void {
+  private setupAllListeners(): void {
     if (!this.socket) return;
 
     // Estado de mesas actualizado
-    this.socket.on('estado-mesas-actualizado', (mesas: MesaEstado[]) => {
+    this.socket.on('estado-mesas', (mesas: MesaEstado[]) => {
       this.mesasEstado.next(mesas);
     });
 
+    // Pedidos por estado (respuesta del backend)
+    this.socket.on('pedidos-por-estado', (data: { estado: string, pedidos: PedidoGeneral[] }) => {
+      this.actualizarPedidosPorTipo(data.pedidos);
+    });
+
     // Nuevo pedido creado
-    this.socket.on('pedido-creado', (pedido: PedidoMesa) => {
-      const pedidosActuales = this.pedidosActivos.value;
-      this.pedidosActivos.next([...pedidosActuales, pedido]);
+    this.socket.on('pedido-creado', (pedido: PedidoGeneral) => {
+      this.agregarPedido(pedido);
+      console.log('✅ Nuevo pedido creado:', pedido);
     });
 
     // Pedido actualizado
-    this.socket.on('pedido-actualizado', (pedidoActualizado: PedidoMesa) => {
-      const pedidosActuales = this.pedidosActivos.value;
-      const index = pedidosActuales.findIndex(p => p.id === pedidoActualizado.id);
-      if (index !== -1) {
-        pedidosActuales[index] = pedidoActualizado;
-        this.pedidosActivos.next([...pedidosActuales]);
-      }
+    this.socket.on('pedido-actualizado', (pedidoActualizado: PedidoGeneral) => {
+      this.actualizarPedido(pedidoActualizado);
+      console.log('🔄 Pedido actualizado:', pedidoActualizado);
     });
 
     // Mesa ocupada/liberada
@@ -298,25 +367,137 @@ export class SocketService {
       console.error('❌ Error en operación:', error);
     });
 
-    // Notificación para cocina
-    this.socket.on('nuevo-pedido-cocina', (pedido: PedidoMesa) => {
+    // Notificaciones específicas
+    this.socket.on('nuevo-pedido-cocina', (pedido: PedidoGeneral) => {
       console.log('🍳 Nuevo pedido para cocina:', pedido);
     });
 
-    // Notificación para caja
-    this.socket.on('pedido-listo-pago', (pedido: PedidoMesa) => {
+    this.socket.on('pedido-listo-pago', (pedido: PedidoGeneral) => {
       console.log('💰 Pedido listo para pago:', pedido);
     });
+
+    this.socket.on('pedido-entregado', (pedido: PedidoGeneral) => {
+      console.log('📦 Pedido entregado:', pedido);
+    });
+
+    this.socket.on('mesa-liberada', (mesaInfo: { numero: number }) => {
+      console.log('🆓 Mesa liberada:', mesaInfo.numero);
+    });
   }
+
+  // ========== MÉTODOS AUXILIARES PARA MANEJO DE PEDIDOS ==========
+
+  // Actualizar pedidos por tipo
+  private actualizarPedidosPorTipo(pedidos: PedidoGeneral[]): void {
+    const pedidosMesa: PedidoMesa[] = [];
+    const pedidosDelivery: PedidoDelivery[] = [];
+    const pedidosLlevar: PedidoLlevar[] = [];
+
+    pedidos.forEach(pedido => {
+      switch (pedido.tipo) {
+        case 'mesa':
+          pedidosMesa.push(pedido as PedidoMesa);
+          break;
+        case 'delivery':
+          pedidosDelivery.push(pedido as PedidoDelivery);
+          break;
+        case 'llevar':
+          pedidosLlevar.push(pedido as PedidoLlevar);
+          break;
+      }
+    });
+
+    this.pedidosActivos.next(pedidosMesa);
+    this.pedidosDelivery.next(pedidosDelivery);
+    this.pedidosLlevar.next(pedidosLlevar);
+    this.todosPedidos.next(pedidos);
+  }
+
+  // Agregar nuevo pedido
+  private agregarPedido(pedido: PedidoGeneral): void {
+    const todosPedidosActuales = this.todosPedidos.value;
+    this.todosPedidos.next([...todosPedidosActuales, pedido]);
+
+    switch (pedido.tipo) {
+      case 'mesa':
+        const pedidosMesa = this.pedidosActivos.value;
+        this.pedidosActivos.next([...pedidosMesa, pedido as PedidoMesa]);
+        break;
+      case 'delivery':
+        const pedidosDelivery = this.pedidosDelivery.value;
+        this.pedidosDelivery.next([...pedidosDelivery, pedido as PedidoDelivery]);
+        break;
+      case 'llevar':
+        const pedidosLlevar = this.pedidosLlevar.value;
+        this.pedidosLlevar.next([...pedidosLlevar, pedido as PedidoLlevar]);
+        break;
+    }
+  }
+
+  // Actualizar pedido existente
+  private actualizarPedido(pedidoActualizado: PedidoGeneral): void {
+    // Actualizar en todos los pedidos
+    const todosPedidos = this.todosPedidos.value;
+    const indexTodos = todosPedidos.findIndex(p => p.id === pedidoActualizado.id);
+    if (indexTodos !== -1) {
+      todosPedidos[indexTodos] = pedidoActualizado;
+      this.todosPedidos.next([...todosPedidos]);
+    }
+
+    // Actualizar en el observable específico según el tipo
+    switch (pedidoActualizado.tipo) {
+      case 'mesa':
+        const pedidosMesa = this.pedidosActivos.value;
+        const indexMesa = pedidosMesa.findIndex(p => p.id === pedidoActualizado.id);
+        if (indexMesa !== -1) {
+          pedidosMesa[indexMesa] = pedidoActualizado as PedidoMesa;
+          this.pedidosActivos.next([...pedidosMesa]);
+        }
+        break;
+      case 'delivery':
+        const pedidosDelivery = this.pedidosDelivery.value;
+        const indexDelivery = pedidosDelivery.findIndex(p => p.id === pedidoActualizado.id);
+        if (indexDelivery !== -1) {
+          pedidosDelivery[indexDelivery] = pedidoActualizado as PedidoDelivery;
+          this.pedidosDelivery.next([...pedidosDelivery]);
+        }
+        break;
+      case 'llevar':
+        const pedidosLlevar = this.pedidosLlevar.value;
+        const indexLlevar = pedidosLlevar.findIndex(p => p.id === pedidoActualizado.id);
+        if (indexLlevar !== -1) {
+          pedidosLlevar[indexLlevar] = pedidoActualizado as PedidoLlevar;
+          this.pedidosLlevar.next([...pedidosLlevar]);
+        }
+        break;
+    }
+  }
+
+  // ========== MÉTODOS PÚBLICOS PARA OBTENER DATOS ==========
 
   // Obtener estado actual de mesas
   getMesasEstado(): MesaEstado[] {
     return this.mesasEstado.value;
   }
 
-  // Obtener pedidos activos
+  // Obtener pedidos activos de mesa
   getPedidosActivos(): PedidoMesa[] {
     return this.pedidosActivos.value;
+  }
+
+  // Obtener pedidos de delivery
+  getPedidosDelivery(): PedidoDelivery[] {
+    return this.pedidosDelivery.value;
+  }
+
+  // Obtener pedidos para llevar
+  getPedidosLlevar(): PedidoLlevar[] {
+    return this.pedidosLlevar.value;
+  }
+
+  // Obtener todos los pedidos
+  getTodosPedidos(): PedidoGeneral[] {
+    return this.todosPedidos.value;
   }
 
   // Verificar si una mesa está disponible
