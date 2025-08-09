@@ -8,12 +8,12 @@ import { NotificationService } from '../../services/notification.service';
 import { CatalogoService } from '../../services/catalogo.service';
 import { DexieService } from '../../services/dexie.service';
 import { LoginModalComponent } from '../../components/login-modal/login-modal.component';
-import { SocketTestComponent } from '../../components/socket-test/socket-test.component';
+
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, LoginModalComponent, SocketTestComponent],
+  imports: [CommonModule, FormsModule, RouterModule, LoginModalComponent],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.css']
 })
@@ -613,24 +613,21 @@ export class HomeComponent implements OnInit {
   async clickMesa(mesa: any): Promise<void> {
     console.log('Click en mesa:', mesa);
     
-    // Si la mesa está dividida, mostrar opciones de unir
-    if (mesa.dividida) {
-      const baseNum = typeof mesa.numero === 'string' ? parseInt(mesa.numero.match(/^\d+/)?.[0] || mesa.numero) : mesa.numero;
-      this.modalType = 'unir';
-      this.modalMesa = baseNum;
-      this.modalBaseNum = baseNum;
-      this.showMesaModal = true;
-      return;
-    }
-    
     if (mesa.estado === this.MESA_ESTADOS.LIBRE) {
-      // Mesa libre - mostrar opciones para nuevo pedido
-      this.modalType = 'libre';
-      this.modalMesa = mesa.numero;
-      this.modalBaseNum = typeof mesa.numero === 'string' ? parseInt(mesa.numero.match(/^\d+/)?.[0] || mesa.numero) : mesa.numero;
+      // Mesa libre - verificar si está dividida para mostrar opciones apropiadas
+      if (mesa.dividida) {
+        const baseNum = typeof mesa.numero === 'string' ? parseInt(mesa.numero.match(/^\d+/)?.[0] || mesa.numero) : mesa.numero;
+        this.modalType = 'unir';
+        this.modalMesa = baseNum;
+        this.modalBaseNum = baseNum;
+      } else {
+        this.modalType = 'libre';
+        this.modalMesa = mesa.numero;
+        this.modalBaseNum = typeof mesa.numero === 'string' ? parseInt(mesa.numero.match(/^\d+/)?.[0] || mesa.numero) : mesa.numero;
+      }
       this.showMesaModal = true;
     } else {
-      // Mesa ocupada - mostrar detalles del pedido
+      // Mesa ocupada - mostrar detalles del pedido (sin importar si está dividida)
       console.log('Mesa ocupada clickeada:', { numero: mesa.numero, idPedido: mesa.idPedido, monto: mesa.monto });
       this.modalType = 'ocupada';
       this.modalMesa = mesa.numero;
@@ -684,10 +681,34 @@ export class HomeComponent implements OnInit {
   }
 
   unirMesa(baseNum: number): void {
+    // Verificar si alguna de las sub-mesas tiene pedidos activos
+    const mesaA = this.mesas.find(m => m.numero === `${baseNum}A`);
+    const mesaB = this.mesas.find(m => m.numero === `${baseNum}B`);
+    
+    const mesaAOcupada = mesaA && (mesaA.estado === this.MESA_ESTADOS.OCUPADA || mesaA.estado === this.MESA_ESTADOS.PARCIAL);
+    const mesaBOcupada = mesaB && (mesaB.estado === this.MESA_ESTADOS.OCUPADA || mesaB.estado === this.MESA_ESTADOS.PARCIAL);
+    
+    if (mesaAOcupada || mesaBOcupada) {
+      let mensaje = 'No se puede unir la mesa porque ';
+      if (mesaAOcupada && mesaBOcupada) {
+        mensaje += 'ambas sub-mesas tienen pedidos activos.';
+      } else if (mesaAOcupada) {
+        mensaje += 'la mesa ' + baseNum + 'A tiene un pedido activo.';
+      } else {
+        mensaje += 'la mesa ' + baseNum + 'B tiene un pedido activo.';
+      }
+      mensaje += ' Debe completar o anular los pedidos antes de unir las mesas.';
+      
+      this.notificationService.error(mensaje);
+      return;
+    }
+    
+    // Si ambas sub-mesas están libres, proceder con la unión
     delete this.mesasDivididas[baseNum];
     localStorage.setItem('mesasDivididas', JSON.stringify(this.mesasDivididas));
     this.closeMesaModal();
     this.renderMesas();
+    this.notificationService.success(`Mesa ${baseNum} unida correctamente`);
   }
 
   // Métodos para el modal de login
@@ -759,13 +780,13 @@ export class HomeComponent implements OnInit {
     
     // Siempre resetear variables del pedido para evitar que persistan entre mesas
     // Solo mantener los datos si estamos editando el mismo pedido de la misma mesa
-    const mismaMesaEditando = this.editandoPedido && this.modalMesa === parseInt(num);
+    const mismaMesaEditando = this.editandoPedido && this.modalMesa === num;
     
     if (!mismaMesaEditando) {
       this.pedidoDetalle = [];
       this.totalPedido = 0;
       // Si estamos cambiando de mesa, resetear el modo de edición
-      if (this.modalMesa !== parseInt(num)) {
+      if (this.modalMesa !== num) {
         this.editandoPedido = false;
         this.idPedidoEditando = null;
       }
@@ -782,9 +803,9 @@ export class HomeComponent implements OnInit {
     this.categoriaSeleccionada = 'todos';
     await this.filtrarProductosPorCategoria();
     
-    // Configurar modal Angular
+    // Configurar modal Angular - mantener el número completo con letra
     this.modalType = 'pedido-platos';
-    this.modalMesa = parseInt(num);
+    this.modalMesa = num;
     this.showMesaModal = true;
   }
 
@@ -795,9 +816,9 @@ export class HomeComponent implements OnInit {
     this.montoDirecto = 0;
     this.observacionInput = '';
     
-    // Configurar modal Angular
+    // Configurar modal Angular - mantener el número completo con letra
     this.modalType = 'pedido-monto';
-    this.modalMesa = parseInt(num);
+    this.modalMesa = num;
     this.showMesaModal = true;
   }
 
