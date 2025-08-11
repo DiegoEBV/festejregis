@@ -1,8 +1,6 @@
 # TODO:
 
-- [x] analyze-backend-events: Analizar los eventos del backend Socket.IO para identificar todos los listeners necesarios (priority: High)
-- [x] add-delivery-llevar-interfaces: Agregar interfaces para pedidos de delivery y llevar al socket.service.ts (priority: High)
-- [x] implement-backend-listeners: Implementar listeners para todos los eventos del backend (estado-mesas, pedidos-por-estado, etc.) (priority: High)
-- [x] add-delivery-llevar-methods: Agregar métodos para manejar pedidos de delivery y llevar (priority: Medium)
-- [x] update-observables: Actualizar observables para incluir pedidos de delivery y llevar (priority: Medium)
-- [x] test-real-time-updates: Probar actualizaciones en tiempo real con múltiples dispositivos (priority: Medium)
+- [x] fix-typescript-errors: Corregir errores de TypeScript en home.component.html agregando operador de navegación segura (?.) para propiedades que pueden ser undefined (priority: High)
+- [x] add-safe-navigation-toFixed: Agregar verificaciones de seguridad para .toFixed(2) en mesa.monto, mesa.pagado, pedido.monto, efectivoTotal, yapeTotal, tarjetaTotal, totalDia, ganancia (priority: High)
+- [x] add-safe-navigation-modal: Agregar verificaciones de seguridad para modalMonto, modalPagado, modalSaldoPendiente y pedido.total (priority: High)
+- [x] verify-default-values: Verificar que todas las propiedades numéricas tengan valores por defecto en el componente TypeScript (priority: Medium)

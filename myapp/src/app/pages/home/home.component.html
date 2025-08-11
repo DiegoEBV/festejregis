@@ -75,8 +75,8 @@
                 (contextmenu)="mostrarOpcionesMesa(mesa, $event)">
           <div class="mesa-num">M{{ typeof mesa.numero === 'string' ? mesa.numero : mesa.numero.toString().padStart(2, '0') }}</div>
           <span *ngIf="mesa.estado !== MESA_ESTADOS.LIBRE" class="mesa-monto">
-            S/ {{ mesa.monto.toFixed(2) }}<br>
-            <span *ngIf="mesa.pagado > 0" style="font-size:0.9em">Pagado: S/ {{ mesa.pagado.toFixed(2) }}</span>
+            S/ {{ mesa.monto?.toFixed(2) }}<br>
+            <span *ngIf="mesa.pagado > 0" style="font-size:0.9em">Pagado: S/ {{ mesa.pagado?.toFixed(2) }}</span>
           </span>
         </button>
       </div>
@@ -97,7 +97,7 @@
             <tbody>
               <tr *ngFor="let pedido of pedidosParaLlevar">
                 <td>{{ pedido.cliente }}</td>
-                <td>S/ {{ pedido.monto.toFixed(2) }}</td>
+                <td>S/ {{ pedido.monto?.toFixed(2) }}</td>
                 <td>
                   <span *ngIf="pedido.estado === 'pendiente'" class="estado-pendiente">Pendiente</span>
                   <span *ngIf="pedido.estado === 'parcial'" class="estado-parcial">Parcial</span>
@@ -122,7 +122,7 @@
             <tbody>
               <tr *ngFor="let pedido of pedidosDelivery">
                 <td>{{ pedido.cliente }}</td>
-                <td>S/ {{ pedido.monto.toFixed(2) }}</td>
+                <td>S/ {{ pedido.monto?.toFixed(2) }}</td>
                 <td>
                   <span *ngIf="pedido.estado === 'pendiente'" class="estado-pendiente">Pendiente</span>
                   <span *ngIf="pedido.estado === 'parcial'" class="estado-parcial">Parcial</span>
@@ -142,23 +142,23 @@
       <div class="summary-cards">
         <div class="summary-card efectivo">
           <h3>💵 Efectivo</h3>
-          <div class="amount">S/ {{ efectivoTotal.toFixed(2) }}</div>
+          <div class="amount">S/ {{ efectivoTotal?.toFixed(2) }}</div>
         </div>
         <div class="summary-card yape">
           <h3>📱 Yape</h3>
-          <div class="amount">S/ {{ yapeTotal.toFixed(2) }}</div>
+          <div class="amount">S/ {{ yapeTotal?.toFixed(2) }}</div>
         </div>
         <div class="summary-card tarjeta">
           <h3>💳 Tarjeta</h3>
-          <div class="amount">S/ {{ tarjetaTotal.toFixed(2) }}</div>
+          <div class="amount">S/ {{ tarjetaTotal?.toFixed(2) }}</div>
         </div>
         <div class="summary-card total-dia">
           <h3>🪙 Total del Día</h3>
-          <div class="amount">S/ {{ totalDia.toFixed(2) }}</div>
+          <div class="amount">S/ {{ totalDia?.toFixed(2) }}</div>
         </div>
         <div class="summary-card ganancia">
           <h3>📊 Ganancia</h3>
-          <div class="amount">S/ {{ ganancia.toFixed(2) }}</div>
+          <div class="amount">S/ {{ ganancia?.toFixed(2) }}</div>
         </div>
       </div>
     
@@ -187,10 +187,10 @@
           <td>{{ pedido.tipo }}</td>
           <td>{{ pedido.numero }}</td>
           <td>{{ pedido.fecha | date:'short' }}</td>
-          <td>S/ {{ pedido.total.toFixed(2) }}</td>
+          <td>S/ {{ pedido.total?.toFixed(2) }}</td>
           <td>
             <div *ngFor="let detalle of pedido.detallesPagos" style="margin-bottom: 2px;">
-              <span style="font-weight: bold;">{{ detalle.metodo }}:</span> S/ {{ detalle.monto.toFixed(2) }}
+              <span style="font-weight: bold;">{{ detalle.metodo }}:</span> S/ {{ detalle.monto?.toFixed(2) }}
             </div>
           </td>
         </tr>
@@ -247,14 +247,14 @@
     <div *ngIf="modalType === 'ocupada'">
       <h3>Mesa {{modalMesa}} ({{modalBaseNum === 0 ? 'Ocupada' : 'Pago parcial'}})</h3>
       <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
-        <div style="margin-bottom: 0.5rem;"><b>Monto Total:</b> S/ {{modalMonto.toFixed(2)}}</div>
-        <div style="margin-bottom: 0.5rem;"><b>Pagado:</b> S/ {{modalPagado.toFixed(2)}}</div>
+        <div style="margin-bottom: 0.5rem;"><b>Monto Total:</b> S/ {{modalMonto?.toFixed(2)}}</div>
+        <div style="margin-bottom: 0.5rem;"><b>Pagado:</b> S/ {{modalPagado?.toFixed(2)}}</div>
         <div style="margin-bottom: 0.5rem;"><b>Detalle de abonos:</b><br>
           <div *ngIf="modalAbonosStr" [innerHTML]="modalAbonosStr"></div>
           <i *ngIf="!modalAbonosStr">No hay abonos registrados</i>
         </div>
         <div style="font-weight: bold; color: #e74c3c; font-size: 1.1rem;">
-          Saldo pendiente: S/ {{modalSaldoPendiente.toFixed(2)}}
+          Saldo pendiente: S/ {{modalSaldoPendiente?.toFixed(2)}}
         </div>
       </div>
       
@@ -262,7 +262,7 @@
       <form *ngIf="authService.isCaja()" #abonoForm (ngSubmit)="onAbonoSubmit(abonoForm)" autocomplete="off" style="margin-top:8px;">
         <label>Monto a abonar:<br>
           <input type="number" [min]="0.01" [max]="modalSaldoPendiente" step="0.01" name="abono" required
-              placeholder="Máximo: S/ {{modalSaldoPendiente.toFixed(2)}}"
+              placeholder="Máximo: S/ {{modalSaldoPendiente?.toFixed(2)}}"
               style="width:100%;padding:7px;border-radius:8px;border:1.5px solid #ccc;">
         </label><br>
         <label>Medio de Pago:</label>
@@ -350,7 +350,7 @@
               <div style="font-weight: bold;">{{producto.nombre}}</div>
               <small style="color: #666;">
                 <span>{{producto.categoria | titlecase}}</span>
-                <span style="color: #28a745; font-weight: 600;">S/ {{producto.precio.toFixed(2)}}</span>
+                <span style="color: #28a745; font-weight: 600;">S/ {{producto.precio?.toFixed(2)}}</span>
               </small>
             </div>
           </div>
@@ -396,7 +396,7 @@
                   </div>
                 </td>
                 <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">S/ {{item.precio}}</td>
-                <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">S/ {{(item.precio * item.cantidad).toFixed(2)}}</td>
+                <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">S/ {{(item.precio * item.cantidad)?.toFixed(2)}}</td>
                 <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">
                   <button type="button" style="background: #dc3545; color: white; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer;" 
                           (click)="eliminarProductoPedido(i)">×</button>
@@ -406,7 +406,7 @@
           </table>
         </div>
         <div style="text-align: right; margin-top: 10px; font-weight: bold; font-size: 1.1em;">
-          Total: S/ {{totalPedido.toFixed(2)}}
+          Total: S/ {{totalPedido?.toFixed(2)}}
         </div>
       </div>
       
@@ -550,8 +550,8 @@
       <div style="margin-bottom: 15px;">
         <strong>Cliente:</strong> {{pedidoEspecialSeleccionado?.cliente}}<br>
         <strong>Monto total:</strong> S/ {{pedidoEspecialSeleccionado?.monto?.toFixed(2)}}<br>
-        <strong>Pagado:</strong> S/ {{(pedidoEspecialSeleccionado?.pagado || 0).toFixed(2)}}<br>
-        <strong>Saldo pendiente:</strong> S/ {{(pedidoEspecialSeleccionado?.monto - (pedidoEspecialSeleccionado?.pagado || 0)).toFixed(2)}}
+        <strong>Pagado:</strong> S/ {{(pedidoEspecialSeleccionado?.pagado || 0)?.toFixed(2)}}<br>
+        <strong>Saldo pendiente:</strong> S/ {{(pedidoEspecialSeleccionado?.monto - (pedidoEspecialSeleccionado?.pagado || 0))?.toFixed(2)}}
       </div>
       
       <!-- Detalle de abonos si existen -->
@@ -560,7 +560,7 @@
         <strong>Detalle de Abonos:</strong><br>
         <div *ngFor="let abono of pedidoEspecialSeleccionado.abonos" 
               style="font-size:0.97em; color:#444; margin-bottom:2px;">
-           {{abono.tipo_pago.charAt(0).toUpperCase() + abono.tipo_pago.slice(1)}}: S/ {{abono.monto.toFixed(2)}} - {{abono.fecha | date:'short'}}
+           {{abono.tipo_pago.charAt(0).toUpperCase() + abono.tipo_pago.slice(1)}}: S/ {{abono.monto?.toFixed(2)}} - {{abono.fecha | date:'short'}}
          </div>
       </div>
       

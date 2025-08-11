@@ -157,10 +157,6 @@ export class HomeComponent implements OnInit {
     
     // Configurar eventos de teclado para autocompletado
     this.configurarEventosTeclado();
-    
-    // Probar conectividad con el servidor Socket.IO
-    console.log('🔍 Iniciando prueba de conectividad desde HomeComponent...');
-    this.socketService.testConnectivity();
   }
   
 
@@ -1979,6 +1975,77 @@ export class HomeComponent implements OnInit {
       console.log('Solicitud de sincronización recibida');
       this.sincronizarDatos();
     });
+
+    // Suscripciones a observables para actualizaciones en tiempo real
+    this.socketService.mesasEstado$.subscribe((mesas) => {
+      console.log('🔄 Estado de mesas actualizado desde observable:', mesas);
+      if (mesas && mesas.length > 0) {
+        // Actualizar las mesas del componente
+        this.actualizarMesasDesdeObservable(mesas);
+      }
+    });
+
+    this.socketService.pedidosActivos$.subscribe((pedidos) => {
+      console.log('🔄 Pedidos de mesa actualizados desde observable:', pedidos);
+      if (pedidos) {
+        // Actualizar pedidos de mesa y re-renderizar
+        this.renderMesas();
+      }
+    });
+
+    this.socketService.pedidosDelivery$.subscribe((pedidos) => {
+      console.log('🔄 Pedidos delivery actualizados desde observable:', pedidos);
+      if (pedidos) {
+        this.pedidosDelivery = pedidos;
+      }
+    });
+
+    this.socketService.pedidosLlevar$.subscribe((pedidos) => {
+      console.log('🔄 Pedidos para llevar actualizados desde observable:', pedidos);
+      if (pedidos) {
+        this.pedidosParaLlevar = pedidos;
+      }
+    });
+
+    this.socketService.todosPedidos$.subscribe((pedidos) => {
+      console.log('🔄 Todos los pedidos actualizados desde observable:', pedidos);
+      // Aquí se pueden hacer actualizaciones globales si es necesario
+    });
+
+    this.socketService.connectionStatus$.subscribe((conectado) => {
+      console.log('🔄 Estado de conexión actualizado:', conectado);
+      this.isOnline = conectado;
+      if (conectado) {
+        this.notificationService.success('Conectado al servidor');
+      } else {
+        this.notificationService.warning('Desconectado del servidor');
+      }
+    });
+  }
+
+  /**
+   * Actualiza las mesas del componente desde el observable del SocketService
+   */
+  actualizarMesasDesdeObservable(mesasActualizadas: any[]): void {
+    console.log('📋 Actualizando mesas desde observable:', mesasActualizadas);
+    
+    // Actualizar el estado de las mesas
+    mesasActualizadas.forEach(mesaActualizada => {
+      const mesaIndex = this.mesas.findIndex(mesa => mesa.numero === mesaActualizada.numero);
+      if (mesaIndex !== -1) {
+        // Actualizar mesa existente
+        this.mesas[mesaIndex] = { ...this.mesas[mesaIndex], ...mesaActualizada };
+      } else {
+        // Agregar nueva mesa si no existe
+        this.mesas.push(mesaActualizada);
+      }
+    });
+    
+    // Re-renderizar las mesas para reflejar los cambios
+    this.renderMesas();
+    
+    // Detectar cambios para actualizar la vista
+    this.cdr.detectChanges();
   }
   
   exportarBD(): void {
