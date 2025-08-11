@@ -506,20 +506,4 @@ export class SocketService {
     return mesa ? !mesa.ocupada : true;
   }
 
-  // Método de prueba de conectividad
-  testConnectivity(): void {
-    console.log('🧪 Iniciando prueba de conectividad...');
-    console.log('🌐 URL del servidor:', this.serverUrl);
-    console.log('🔗 Estado de conexión actual:', this.isConnected());
-    
-    // Intentar conectar con datos de prueba
-    const testUser = {
-      id: 'test-user-' + Date.now(),
-      nombre: 'Usuario de Prueba',
-      rol: 'mesero'
-    };
-    
-    console.log('🚀 Iniciando conexión de prueba...');
-    this.connect(testUser);
-  }
 }
