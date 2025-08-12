@@ -1811,7 +1811,7 @@ export class HomeComponent implements OnInit {
   private reconnectDelay = 1000; // Inicial: 1 segundo
   private heartbeatInterval: any;
   private eventQueue: any[] = []; // Cola de eventos offline
-  private isOnline = true;
+  public isOnline = true;
 
   configurarEventosSocket(): void {
     // Eventos de conexión

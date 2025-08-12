@@ -1432,3 +1432,75 @@ h2::after {
 .gap-2 {
   gap: 1rem;
 }
+
+/* Indicador de conexión Socket.IO */
+.connection-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+
+.connection-indicator.connected {
+  background: rgba(76, 175, 80, 0.1);
+  color: #2e7d32;
+  border-color: rgba(76, 175, 80, 0.3);
+}
+
+.connection-indicator.disconnected {
+  background: rgba(244, 67, 54, 0.1);
+  color: #c62828;
+  border-color: rgba(244, 67, 54, 0.3);
+  animation: pulse 2s infinite;
+}
+
+.connection-icon {
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.connection-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Responsive para el indicador de conexión */
+@media (max-width: 768px) {
+  .connection-indicator {
+    padding: 0.3rem 0.6rem;
+    gap: 0.2rem;
+  }
+  
+  .connection-text {
+    display: none;
+  }
+  
+  .connection-icon {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .connection-indicator {
+    padding: 0.2rem 0.4rem;
+  }
+}
