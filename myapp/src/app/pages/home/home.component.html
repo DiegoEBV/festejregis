@@ -18,6 +18,15 @@
     <!-- Right side controls -->
     <div class="navbar-controls">
       <span class="date-display">{{ fechaActual }}</span>
+      
+      <!-- Indicador de conexión Socket.IO -->
+      <div class="connection-indicator" 
+           [ngClass]="{'connected': isOnline, 'disconnected': !isOnline}"
+           [title]="isOnline ? 'Conectado al servidor' : 'Desconectado del servidor'">
+        <span class="connection-icon">{{ isOnline ? '🟢' : '🔴' }}</span>
+        <span class="connection-text">{{ isOnline ? 'Online' : 'Offline' }}</span>
+      </div>
+      
       <button id="toggleDarkMode" class="control-btn dark-mode-btn" title="Modo oscuro">🌙</button>
       <button class="control-btn user-btn" title="Cambiar usuario" (click)="logout()">👤</button>
       <button id="installBtn" class="control-btn install-btn" style="display:none" title="Instalar app">⬇️</button>

@@ -1,6 +1,7 @@
 import { Component, OnInit, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
 import { DexieService } from '../../services/dexie.service';
 import { AuthService } from '../../services/auth.service';
 import { CatalogoService } from '../../services/catalogo.service';
@@ -9,7 +10,7 @@ import Chart from 'chart.js/auto';
 @Component({
   selector: 'app-productividad',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   providers: [DatePipe],
   templateUrl: './productividad.component.html',
   styleUrls: ['./productividad.component.css']
@@ -50,32 +51,52 @@ export class ProductividadComponent implements OnInit, AfterViewInit {
     
     this.fechaFin = hoy.toISOString().split('T')[0];
     this.fechaInicio = hoy.toISOString().split('T')[0];
-    
-    // Inicializar el menú lateral
-    this.inicializarMenuLateral();
   }
   
   ngAfterViewInit(): void {
+    // Inicializar el menú lateral después de que la vista esté lista
+    setTimeout(() => {
+      this.inicializarMenuLateral();
+    }, 100);
+    
     // Cargar datos iniciales después de que la vista esté lista
     this.generarReporte();
   }
   
   inicializarMenuLateral(): void {
+    console.log('🔧 Inicializando menú lateral...');
     const menuButton = document.getElementById('menuButton');
     const sideMenu = document.getElementById('sideMenu');
     
+    console.log('🔧 Elementos encontrados:', { menuButton: !!menuButton, sideMenu: !!sideMenu });
+    
     if (menuButton && sideMenu) {
-      menuButton.addEventListener('click', () => {
-        sideMenu.classList.toggle('open');
-      });
+      // Remover listeners previos si existen
+      menuButton.removeEventListener('click', this.toggleMenu);
+      
+      // Agregar nuevo listener
+      menuButton.addEventListener('click', this.toggleMenu.bind(this));
       
       // Cerrar menú al hacer clic fuera
       document.addEventListener('click', (event) => {
         if (!sideMenu.contains(event.target as Node) && 
             event.target !== menuButton) {
           sideMenu.classList.remove('open');
+          console.log('🔧 Menú cerrado por clic fuera');
         }
       });
+      
+      console.log('🔧 Menú lateral inicializado correctamente');
+    } else {
+      console.error('🔧 Error: No se encontraron los elementos del menú lateral');
+    }
+  }
+  
+  toggleMenu(): void {
+    const sideMenu = document.getElementById('sideMenu');
+    if (sideMenu) {
+      sideMenu.classList.toggle('open');
+      console.log('🔧 Menú toggled, estado open:', sideMenu.classList.contains('open'));
     }
   }
   
