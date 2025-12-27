@@ -35,6 +35,28 @@ const io = new Server(server, {
   pingInterval: 25000
 });
 
+// Claves de autenticación (Deben coincidir con frontend)
+const CLAVES = {
+  caja: '123',
+  moso: '456',
+  cocina: '789'
+};
+
+const fs = require('fs');
+const path = require('path');
+const DATA_FILE = path.join(__dirname, 'server-data.json');
+
+// Cargar datos persistentes
+let savedData = {};
+try {
+  if (fs.existsSync(DATA_FILE)) {
+    savedData = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    console.log('📂 Datos del servidor cargados correctamente');
+  }
+} catch (err) {
+  console.error('Error cargando datos:', err);
+}
+
 // Almacenar conexiones por rol
 let usuarios = {
   caja: [],
@@ -42,12 +64,44 @@ let usuarios = {
   cocina: []
 };
 
-// Estadísticas del servidor
+// Estadísticas del servidor (con persistencia)
 let estadisticas = {
   conexionesActivas: 0,
-  pedidosEnviados: 0,
+  pedidosEnviados: savedData.pedidosEnviados || 0,
   ultimaActividad: new Date()
 };
+
+// Función para guardar datos
+function guardarDatos() {
+  try {
+    const dataToSave = {
+      pedidosEnviados: estadisticas.pedidosEnviados,
+      lastUpdate: new Date()
+    };
+    fs.writeFileSync(DATA_FILE, JSON.stringify(dataToSave));
+  } catch (err) {
+    console.error('Error guardando datos:', err);
+  }
+}
+
+// Middleware de autenticación
+io.use((socket, next) => {
+  const { userRole, userKey } = socket.handshake.query;
+
+  // Permitir conexiones sin rol inicialmente (para check de estado), 
+  // pero si envían rol, validar clave.
+  if (userRole) {
+    if (CLAVES[userRole] && CLAVES[userRole] === userKey) {
+      socket.rol = userRole;
+      socket.auth = true;
+      return next();
+    } else {
+      console.log(`⛔ Intento de conexión no autorizado: ${userRole}`);
+      return next(new Error('Autenticación fallida'));
+    }
+  }
+  next();
+});
 
 io.on('connection', (socket) => {
   console.log(`Nueva conexión: ${socket.id}`);
@@ -65,29 +119,38 @@ io.on('connection', (socket) => {
   // Identificación del usuario
   socket.on('identificarse', (userData) => {
     try {
-      socket.userData = userData;
       const rol = userData.rol || userData.userRole || 'caja';
+      const key = userData.clave || userData.userKey;
+
+      // Validar clave si el rol requiere autenticación
+      if (CLAVES[rol] && CLAVES[rol] !== key) {
+        console.log(`❌ Identificación fallida para rol ${rol}: Clave incorrecta`);
+        socket.emit('error', { mensaje: 'Autenticación fallida: Clave incorrecta' });
+        return;
+      }
+
+      socket.userData = userData;
       socket.rol = rol;
-      
+
       // Agregar a la lista correspondiente
       if (usuarios[rol]) {
         usuarios[rol].push(socket);
         console.log(`Usuario ${userData.nombre || userData.userName || 'Anónimo'} conectado como ${rol}`);
       }
-      
+
       // Confirmar identificación
       socket.emit('identificado', {
         rol: rol,
         mensaje: `Conectado como ${rol}`,
         timestamp: new Date().toISOString()
       });
-      
+
       // Notificar a otros usuarios del mismo rol
       socket.to(rol).emit('usuario-conectado', {
         usuario: userData.nombre || userData.userName,
         rol: rol
       });
-      
+
     } catch (error) {
       console.error('Error en identificación:', error);
       socket.emit('error', { mensaje: 'Error en identificación' });
@@ -100,7 +163,8 @@ io.on('connection', (socket) => {
       console.log('Nuevo pedido recibido:', pedido);
       estadisticas.pedidosEnviados++;
       estadisticas.ultimaActividad = new Date();
-      
+      guardarDatos(); // Guardar actualización
+
       // Enviar a todas las cajas
       usuarios.caja.forEach(cajaSocket => {
         if (cajaSocket.id !== socket.id) {
@@ -111,7 +175,7 @@ io.on('connection', (socket) => {
           });
         }
       });
-      
+
       // Enviar a cocina
       usuarios.cocina.forEach(cocinaSocket => {
         cocinaSocket.emit('pedidoRecibido', {
@@ -120,14 +184,14 @@ io.on('connection', (socket) => {
           origen: socket.userData?.nombre || 'Mozo'
         });
       });
-      
+
       // Confirmar recepción
       socket.emit('pedido-confirmado', {
         id: pedido.id,
         mensaje: 'Pedido enviado correctamente',
         timestamp: new Date().toISOString()
       });
-      
+
     } catch (error) {
       console.error('Error procesando pedido:', error);
       socket.emit('error', { mensaje: 'Error procesando pedido' });
@@ -139,7 +203,7 @@ io.on('connection', (socket) => {
     try {
       console.log('Respuesta de caja:', datos);
       estadisticas.ultimaActividad = new Date();
-      
+
       // Enviar a todos los mozos
       usuarios.moso.forEach(mozoSocket => {
         mozoSocket.emit('respuestaDeCaja', {
@@ -148,7 +212,7 @@ io.on('connection', (socket) => {
           origen: socket.userData?.nombre || 'Caja'
         });
       });
-      
+
     } catch (error) {
       console.error('Error procesando respuesta de caja:', error);
       socket.emit('error', { mensaje: 'Error procesando respuesta' });
@@ -191,12 +255,12 @@ io.on('connection', (socket) => {
     console.log(`Desconexión: ${socket.id}, razón: ${reason}`);
     estadisticas.conexionesActivas--;
     estadisticas.ultimaActividad = new Date();
-    
+
     // Remover de todas las listas
     Object.keys(usuarios).forEach(rol => {
       usuarios[rol] = usuarios[rol].filter(s => s.id !== socket.id);
     });
-    
+
     // Notificar desconexión si tenía rol
     if (socket.rol && socket.userData) {
       usuarios[socket.rol].forEach(userSocket => {

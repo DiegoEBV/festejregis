@@ -72,7 +72,7 @@ export class SocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectInterval = 3000;
-  
+
   // Estados observables para tiempo real
   private connectionStatus = new BehaviorSubject<boolean>(false);
   private mesasEstado = new BehaviorSubject<MesaEstado[]>([]);
@@ -80,7 +80,7 @@ export class SocketService {
   private pedidosDelivery = new BehaviorSubject<PedidoDelivery[]>([]);
   private pedidosLlevar = new BehaviorSubject<PedidoLlevar[]>([]);
   private todosPedidos = new BehaviorSubject<PedidoGeneral[]>([]);
-  
+
   public connectionStatus$ = this.connectionStatus.asObservable();
   public mesasEstado$ = this.mesasEstado.asObservable();
   public pedidosActivos$ = this.pedidosActivos.asObservable();
@@ -110,7 +110,8 @@ export class SocketService {
       query: {
         userId: userData.id,
         userName: userData.nombre,
-        userRole: userData.rol
+        userRole: userData.rol || userData.tipo, // Map tipo to rol
+        userKey: userData.clave // Send key in query too just in case
       }
     });
 
@@ -120,13 +121,13 @@ export class SocketService {
       console.log('✅ Conectado al servidor Socket.IO:', this.serverUrl);
       this.reconnectAttempts = 0;
       this.connectionStatus.next(true);
-      
+
       // Identificarse automáticamente
       this.socket.emit('identificarse', userData);
-      
+
       // Configurar listeners específicos para todos los tipos de pedidos
       this.setupAllListeners();
-      
+
       // Solicitar estado inicial de mesas y pedidos
       this.socket.emit('obtener-estado-mesas');
       this.socket.emit('obtener-pedidos-estado', { estado: 'pendiente' });
@@ -143,8 +144,8 @@ export class SocketService {
         type: error.type
       });
       this.connectionStatus.next(false);
-       this.handleReconnect(userData);
-     });
+      this.handleReconnect(userData);
+    });
 
     this.socket.on('disconnect', (reason: string) => {
       console.log('🔌 Desconectado del servidor Socket.IO:', reason);
@@ -173,7 +174,7 @@ export class SocketService {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       console.log(`🔄 Intentando reconectar (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
-      
+
       setTimeout(() => {
         this.connect(userData);
       }, this.reconnectInterval);
@@ -204,7 +205,7 @@ export class SocketService {
           subscriber.next(data);
         });
       }
-      
+
       return () => {
         if (this.socket) {
           this.socket.off(eventName);

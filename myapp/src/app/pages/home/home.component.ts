@@ -19,7 +19,7 @@ import { LoginModalComponent } from '../../components/login-modal/login-modal.co
 })
 export class HomeComponent implements OnInit {
   @ViewChild('fileInput') fileInput!: ElementRef;
-  
+
   fechaActual: string = '';
   cajaApertura: number = 0;
   efectivoTotal: number = 0;
@@ -27,14 +27,14 @@ export class HomeComponent implements OnInit {
   tarjetaTotal: number = 0;
   totalDia: number = 0;
   ganancia: number = 0;
-  
+
   // Variables para cierre automático
   fechaAnterior: string = '';
   cierreAutomaticoActivo: boolean = true;
   ultimaVerificacionCierre: Date = new Date();
-  
 
-  
+
+
   // Variables para reportes
   fechaInicioReporte: string = '';
   fechaFinReporte: string = '';
@@ -45,22 +45,22 @@ export class HomeComponent implements OnInit {
   totalReporte: number = 0;
   gananciaReporte: number = 0;
   detallesReporte: any[] = [];
-  
+
   pedidosParaLlevar: any[] = [];
   pedidosDelivery: any[] = [];
   historialPagados: any[] = [];
-  
+
   // Gestión de mesas
   mesas: any[] = [];
   mesasDivididas: any = {};
   TOTAL_MESAS = 27;
   MESA_ESTADOS = { LIBRE: 'libre', OCUPADA: 'ocupada', PARCIAL: 'parcial' };
-  
+
   // Modal de mesa
   showMesaModal: boolean = false;
   mesaModalContent: string = '';
   mesaSeleccionada: any = null;
-  
+
   // Estados del modal
   modalType: string = ''; // 'libre', 'ocupada', 'dividir'
   modalMesa: any = null;
@@ -71,11 +71,11 @@ export class HomeComponent implements OnInit {
   modalAbonosStr: string = '';
   modalBaseNum: number = 0;
   selectedPaymentMethod: string = '';
-  
+
   // Pedido actual
   pedidoActual: any = null;
   showPedidoModal: boolean = false;
-  
+
   // Variables para formularios de pedidos
   pedidoDetalle: any[] = [];
   productoSeleccionado: any = null;
@@ -84,11 +84,11 @@ export class HomeComponent implements OnInit {
   observacionInput: string = '';
   montoDirecto: number = 0;
   totalPedido: number = 0;
-  
+
   // Autocompletado
   sugerenciasProductos: any[] = [];
   showSugerencias: boolean = false;
-  
+
   // Catálogo de productos
   catalogoProductos: any[] = [];
   catalogoCargado: boolean = false;
@@ -96,22 +96,22 @@ export class HomeComponent implements OnInit {
   // Variables para edición de pedidos
   editandoPedido: boolean = false;
   idPedidoEditando: number | null = null;
-  
+
   // Variables para el modal de login
   showLoginModal: boolean = true;
   usuario: string = 'cajero';
   nombreMozo: string = '';
   clave: string = '';
   usuarioActual: any = null;
-  
+
   // Variables para navegación con teclado en autocompletado
   selectedSuggestionIndex: number = -1;
-  
+
   // Variables para filtros de categoría
   categoriaSeleccionada: string = 'todos';
   categorias: any[] = [];
   productosFiltrados: any[] = [];
-  
+
   constructor(
     private dexieService: DexieService,
     private socketService: SocketService,
@@ -120,17 +120,17 @@ export class HomeComponent implements OnInit {
     private catalogoService: CatalogoService,
 
     private cdr: ChangeDetectorRef
-  ) {}
-  
+  ) { }
+
   ngOnInit(): void {
     this.actualizarFecha();
     this.inicializarCierreAutomatico();
     setInterval(() => this.actualizarFecha(), 60000); // Actualizar cada minuto
     setInterval(() => this.verificarCierreAutomatico(), 300000); // Verificar cierre cada 5 minutos
-    
+
     // Inicializar fechas por defecto para reportes
     this.inicializarFechasReporte();
-    
+
     // Verificar si hay un usuario autenticado
     this.usuarioActual = this.authService.currentUserValue;
     if (!this.usuarioActual) {
@@ -148,19 +148,19 @@ export class HomeComponent implements OnInit {
         this.inicializarAplicacion();
       }
     });
-    
+
     // Inicializar el menú lateral
     this.inicializarMenuLateral();
-    
+
     // Inicializar el modo oscuro
     this.inicializarModoOscuro();
-    
+
     // Configurar eventos de teclado para autocompletado
     this.configurarEventosTeclado();
   }
-  
 
-  
+
+
   actualizarFecha(): void {
     const ahora = new Date();
     const opciones: Intl.DateTimeFormatOptions = {
@@ -170,11 +170,15 @@ export class HomeComponent implements OnInit {
       day: 'numeric'
     };
     this.fechaActual = ahora.toLocaleDateString('es-ES', opciones);
-    
+
     // Verificar cambio de día para cierre automático
     const fechaHoyStr = ahora.toISOString().split('T')[0];
     if (this.fechaAnterior && this.fechaAnterior !== fechaHoyStr) {
       this.ejecutarCierreAutomatico(this.fechaAnterior);
+      // Actualizar vista para el nuevo día
+      setTimeout(() => {
+        this.sincronizarDatos();
+      }, 1000);
     }
     this.fechaAnterior = fechaHoyStr;
   }
@@ -185,23 +189,23 @@ export class HomeComponent implements OnInit {
     this.fechaInicioReporte = fechaFormateada;
     this.fechaFinReporte = fechaFormateada;
   }
-  
+
   inicializarCierreAutomatico(): void {
     const hoy = new Date();
     this.fechaAnterior = hoy.toISOString().split('T')[0];
     this.ultimaVerificacionCierre = hoy;
-    
+
     // Verificar si hay una caja del día anterior que no se cerró
     this.verificarCierresPendientes();
   }
-  
+
   async verificarCierresPendientes(): Promise<void> {
     try {
       const hoy = new Date();
       const ayer = new Date(hoy);
       ayer.setDate(ayer.getDate() - 1);
       const fechaAyer = ayer.toISOString().split('T')[0];
-      
+
       // Verificar si la caja de ayer está cerrada
       const cajaCerrada = await this.dexieService.verificarCajaCerrada(fechaAyer);
       if (!cajaCerrada) {
@@ -215,49 +219,49 @@ export class HomeComponent implements OnInit {
       console.error('Error al verificar cierres pendientes:', error);
     }
   }
-  
+
   async verificarCierreAutomatico(): Promise<void> {
     if (!this.cierreAutomaticoActivo) return;
-    
+
     try {
       const ahora = new Date();
       const hora = ahora.getHours();
-      
+
       // Verificar si es después de las 23:00 (11 PM)
       if (hora >= 23) {
         const fechaHoy = ahora.toISOString().split('T')[0];
         const cajaCerrada = await this.dexieService.verificarCajaCerrada(fechaHoy);
-        
+
         if (!cajaCerrada) {
           console.log('Iniciando cierre automático de caja para:', fechaHoy);
           await this.ejecutarCierreAutomatico(fechaHoy);
         }
       }
-      
+
       this.ultimaVerificacionCierre = ahora;
     } catch (error) {
       console.error('Error en verificación de cierre automático:', error);
     }
   }
-  
+
   async ejecutarCierreAutomatico(fecha: string): Promise<void> {
     try {
       console.log('Ejecutando cierre automático para la fecha:', fecha);
-      
+
       const resultadoCierre = await this.dexieService.cerrarCajaAutomatico(fecha);
-      
+
       if (resultadoCierre) {
         const mensaje = `🔒 CIERRE AUTOMÁTICO DE CAJA\n` +
-                       `Fecha: ${fecha}\n` +
-                       `Total Ventas: S/. ${resultadoCierre.total.toFixed(2)}\n` +
-                       `Efectivo: S/. ${resultadoCierre.efectivo.toFixed(2)}\n` +
-                       `Yape: S/. ${resultadoCierre.yape.toFixed(2)}\n` +
-                       `Tarjeta: S/. ${resultadoCierre.tarjeta.toFixed(2)}\n` +
-                       `Ganancia: S/. ${resultadoCierre.ganancia.toFixed(2)}`;
-        
+          `Fecha: ${fecha}\n` +
+          `Total Ventas: S/. ${resultadoCierre.total.toFixed(2)}\n` +
+          `Efectivo: S/. ${resultadoCierre.efectivo.toFixed(2)}\n` +
+          `Yape: S/. ${resultadoCierre.yape.toFixed(2)}\n` +
+          `Tarjeta: S/. ${resultadoCierre.tarjeta.toFixed(2)}\n` +
+          `Ganancia: S/. ${resultadoCierre.ganancia.toFixed(2)}`;
+
         this.notificationService.success('Caja cerrada automáticamente');
         console.log(mensaje);
-        
+
         // Actualizar los totales si es el día actual
         const hoy = new Date().toISOString().split('T')[0];
         if (fecha === hoy) {
@@ -271,14 +275,14 @@ export class HomeComponent implements OnInit {
       this.notificationService.error('Error en el cierre automático de caja');
     }
   }
-  
+
   toggleCierreAutomatico(): void {
     this.cierreAutomaticoActivo = !this.cierreAutomaticoActivo;
     const estado = this.cierreAutomaticoActivo ? 'activado' : 'desactivado';
     this.notificationService.success(`Cierre automático ${estado}`);
     console.log(`Cierre automático de caja ${estado}`);
   }
-  
+
   inicializarMenuLateral(): void {
     this.inicializarMenuMobile();
   }
@@ -286,20 +290,20 @@ export class HomeComponent implements OnInit {
   inicializarMenuMobile(): void {
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
     const mobileMenu = document.getElementById('mobileMenu');
-    
+
     if (mobileMenuBtn && mobileMenu) {
       mobileMenuBtn.addEventListener('click', () => {
         mobileMenu.classList.toggle('show');
       });
-      
+
       // Cerrar menú al hacer clic fuera
       document.addEventListener('click', (event) => {
-        if (!mobileMenu.contains(event.target as Node) && 
-            event.target !== mobileMenuBtn) {
+        if (!mobileMenu.contains(event.target as Node) &&
+          event.target !== mobileMenuBtn) {
           mobileMenu.classList.remove('show');
         }
       });
-      
+
       // Cerrar menú al hacer clic en un enlace
       const menuItems = mobileMenu.querySelectorAll('.mobile-menu-item');
       menuItems.forEach(item => {
@@ -313,7 +317,7 @@ export class HomeComponent implements OnInit {
   inicializarModoOscuro(): void {
     const toggleDarkMode = document.getElementById('toggleDarkMode');
     const hostElement = document.querySelector('app-home');
-    
+
     if (toggleDarkMode && hostElement) {
       // Verificar preferencia guardada
       const darkModeEnabled = localStorage.getItem('darkMode') === 'true';
@@ -321,7 +325,7 @@ export class HomeComponent implements OnInit {
         hostElement.classList.add('dark-mode');
         toggleDarkMode.textContent = '☀️';
       }
-      
+
       toggleDarkMode.addEventListener('click', () => {
         hostElement.classList.toggle('dark-mode');
         const isDarkMode = hostElement.classList.contains('dark-mode');
@@ -330,38 +334,38 @@ export class HomeComponent implements OnInit {
       });
     }
   }
-  
+
   logout(): void {
     this.authService.logout();
     this.showLoginModal = true;
     this.usuarioActual = null;
   }
-  
+
   async inicializarAplicacion(): Promise<void> {
     // Cargar catálogo de productos
     await this.cargarCatalogoProductos();
-    
+
     // Cargar datos iniciales directamente ya que Dexie se inicializa automáticamente
     this.cargarDatos();
-    
+
     // Configurar eventos de teclado para autocompletado
     this.configurarEventosTeclado();
-    
+
     // Conectar socket para todos los usuarios autenticados
     this.socketService.connect(this.authService.currentUserValue);
     this.configurarEventosSocket();
     this.configurarEventosSocketMesas();
-    
+
     // Configurar reconexión automática
     this.configurarReconexionSocket();
   }
-  
+
   async cargarCatalogoProductos(): Promise<void> {
     // Evitar múltiples cargas del catálogo
     if (this.catalogoCargado) {
       return;
     }
-    
+
     try {
       this.catalogoProductos = await this.catalogoService.getProductos();
       // Si no hay productos, inicializar con productos de ejemplo
@@ -369,10 +373,10 @@ export class HomeComponent implements OnInit {
         await this.catalogoService.inicializarProductosEjemplo();
         this.catalogoProductos = await this.catalogoService.getProductos();
       }
-      
+
       // Cargar categorías
       this.categorias = this.catalogoService.getCategorias();
-      
+
       this.catalogoCargado = true;
     } catch (error) {
       console.error('Error al cargar catálogo:', error);
@@ -386,40 +390,42 @@ export class HomeComponent implements OnInit {
         this.cajaApertura = caja.monto;
       }
     });
-    
+
     // Cargar pedidos para llevar
     this.cargarPedidosParaLlevar();
-    
+
     // Cargar pedidos delivery
     this.cargarPedidosDelivery();
-    
+
     // Cargar historial de pagados
     this.cargarHistorialPagados();
-    
+
     // Calcular totales
     this.calcularTotales();
-    
+
     // Renderizar mesas
     this.renderMesas();
   }
-  
+
   cargarPedidosParaLlevar(): void {
     this.dexieService.getPedidosEspecialesPorTipo('llevar').then((pedidos: any[]) => {
-      this.pedidosParaLlevar = pedidos;
+      const hoy = new Date().toISOString().split('T')[0];
+      this.pedidosParaLlevar = pedidos.filter(p => p.fecha === hoy && p.estado !== 'pagado');
     });
   }
-  
+
   cargarPedidosDelivery(): void {
     this.dexieService.getPedidosEspecialesPorTipo('delivery').then((pedidos: any[]) => {
-      this.pedidosDelivery = pedidos;
+      const hoy = new Date().toISOString().split('T')[0];
+      this.pedidosDelivery = pedidos.filter(p => p.fecha === hoy && p.estado !== 'pagado');
     });
   }
-  
+
   cargarHistorialPagados(): void {
     const hoy = new Date();
     const inicioDelDia = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()).toISOString();
     const finDelDia = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59, 999).toISOString();
-    
+
     this.dexieService.getHistorialPagos().then((historial: any[]) => {
       // Filtrar por fecha del día actual
       const pagosFiltrados = historial.filter(pago => {
@@ -427,13 +433,13 @@ export class HomeComponent implements OnInit {
         const fechaHoy = new Date();
         return fechaPago.toDateString() === fechaHoy.toDateString();
       });
-      
+
       // Agrupar pagos por pedido
       const pagosAgrupados = new Map();
-      
+
       pagosFiltrados.forEach(pago => {
         const key = `${pago.pedidoId}-${pago.tipo}-${pago.numero}`;
-        
+
         if (pagosAgrupados.has(key)) {
           const pagoExistente = pagosAgrupados.get(key);
           // Agregar el nuevo pago a la lista de detalles
@@ -465,32 +471,32 @@ export class HomeComponent implements OnInit {
           });
         }
       });
-      
+
       // Convertir el Map a array y ordenar por fecha
-      this.historialPagados = Array.from(pagosAgrupados.values()).sort((a, b) => 
+      this.historialPagados = Array.from(pagosAgrupados.values()).sort((a, b) =>
         new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
       );
     });
   }
-  
+
   calcularTotales(): void {
     // Obtener todos los pagos y filtrar por fecha del día actual
     this.dexieService.getHistorialPagos().then((todosLosPagos: any[]) => {
       const hoy = new Date();
       const inicioDelDia = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
       const finDelDia = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59, 999);
-      
+
       // Filtrar pagos del día actual
       const pagosDelDia = todosLosPagos.filter(pago => {
         const fechaPago = new Date(pago.fecha);
         return fechaPago >= inicioDelDia && fechaPago <= finDelDia;
       });
-      
+
       // Inicializar totales
       let efectivo = 0;
       let yape = 0;
       let tarjeta = 0;
-      
+
       // Calcular totales por método de pago
       pagosDelDia.forEach(pago => {
         const monto = pago.total || pago.monto || 0;
@@ -502,7 +508,7 @@ export class HomeComponent implements OnInit {
           tarjeta += monto;
         }
       });
-      
+
       // Actualizar propiedades
       this.efectivoTotal = efectivo;
       this.yapeTotal = yape;
@@ -516,10 +522,10 @@ export class HomeComponent implements OnInit {
   async renderMesas(): Promise<void> {
     const today = new Date().toISOString().split('T')[0];
     const pedidosArr = await this.dexieService.getPedidosPorFecha(today);
-    
+
     const todosLosPedidos = pedidosArr;
     console.log('Total pedidos:', todosLosPedidos.length);
-    
+
     let pedidos: any = {};
     todosLosPedidos.forEach((p: any) => {
       if (!pedidos[p.mesa]) pedidos[p.mesa] = [];
@@ -527,7 +533,7 @@ export class HomeComponent implements OnInit {
     });
 
     this.mesas = [];
-    
+
     // Cargar mesas divididas del localStorage
     const savedMesasDivididas = localStorage.getItem('mesasDivididas');
     if (savedMesasDivididas) {
@@ -546,18 +552,18 @@ export class HomeComponent implements OnInit {
           let monto = 0;
           let pagado = 0;
           let idPedido = null;
-          
+
           const mesaPedidos = pedidos[sub] || [];
           if (mesaPedidos.length > 0) {
-          const pedidoActivo = mesaPedidos.find((p: any) => p.monto > p.pagado && p.estado !== 'anulado');
-          if (pedidoActivo) {
-            estado = pedidoActivo.pagado === 0 ? this.MESA_ESTADOS.OCUPADA : this.MESA_ESTADOS.PARCIAL;
-            monto = pedidoActivo.monto;
-            pagado = pedidoActivo.pagado;
-            idPedido = pedidoActivo.id;
+            const pedidoActivo = mesaPedidos.find((p: any) => p.monto > p.pagado && p.estado !== 'anulado');
+            if (pedidoActivo) {
+              estado = pedidoActivo.pagado === 0 ? this.MESA_ESTADOS.OCUPADA : this.MESA_ESTADOS.PARCIAL;
+              monto = pedidoActivo.monto;
+              pagado = pedidoActivo.pagado;
+              idPedido = pedidoActivo.id;
+            }
           }
-        }
-          
+
           this.mesas.push({
             numero: sub,
             estado: estado,
@@ -574,7 +580,7 @@ export class HomeComponent implements OnInit {
         let monto = 0;
         let pagado = 0;
         let idPedido = null;
-        
+
         if (mesaPedidos.length > 0) {
           const pedidoActivo = mesaPedidos.find((p: any) => p.monto > p.pagado && p.estado !== 'anulado');
           if (pedidoActivo) {
@@ -585,7 +591,7 @@ export class HomeComponent implements OnInit {
             console.log(`Mesa ${n}: estado=${estado}, monto=${monto}, pagado=${pagado}`);
           }
         }
-        
+
         this.mesas.push({
           numero: n,
           estado: estado,
@@ -596,19 +602,27 @@ export class HomeComponent implements OnInit {
         });
       }
     }
-    
-    // Log final para verificar el estado de las mesas
-    console.log('Estado final de mesas:', this.mesas);
-    console.log('Mesas con estado ocupada:', this.mesas.filter(m => m.estado === 'ocupada'));
-    console.log('Mesas con estado parcial:', this.mesas.filter(m => m.estado === 'parcial'));
-    
+
     // Forzar detección de cambios
     this.cdr.detectChanges();
   }
 
+  // Helper para mostrar el precio restante correcto
+  getPrecioRestante(prod: any): number {
+    // Caso especial: Si es un solo producto (ej. Pedido por monto), 
+    // el precio restante debe reflejar el saldo pendiente global del pedido
+    if (this.modalProductos.length === 1) {
+      const totalProducto = prod.precio * prod.cantidad;
+      const saldoPendiente = totalProducto - (this.modalPagado || 0);
+      return Math.max(0, saldoPendiente);
+    }
+
+    // Caso normal: Precio unitario * cantidad pendiente (por items)
+    return prod.precio * (prod.cantidad - (prod.cantidadPagada || 0));
+  }
+
   async clickMesa(mesa: any): Promise<void> {
-    console.log('Click en mesa:', mesa);
-    
+
     if (mesa.estado === this.MESA_ESTADOS.LIBRE) {
       // Mesa libre - verificar si está dividida para mostrar opciones apropiadas
       if (mesa.dividida) {
@@ -633,36 +647,129 @@ export class HomeComponent implements OnInit {
       this.modalSaldoPendiente = mesa.monto - mesa.pagado;
       console.log('modalIdPedido establecido a:', this.modalIdPedido);
       this.modalBaseNum = mesa.monto - mesa.pagado > 0 ? 1 : 0;
-      
+
+      // Inicializar variables para el nuevo modal
+      this.modalProductos = [];
+      this.montoAbonoManual = '';
+
       // Cargar detalles de abonos si existen
       if (mesa.idPedido) {
         try {
           const pedido = await this.dexieService.getPedidoPorId(mesa.idPedido);
-          if (pedido && pedido.abonos && Array.isArray(pedido.abonos) && pedido.abonos.length > 0) {
-            const pagadoActual = pedido.abonos.reduce((sum: number, a: any) => sum + Number(a.monto), 0);
-            this.modalPagado = pagadoActual;
-            this.modalSaldoPendiente = mesa.monto - pagadoActual;
-            this.modalAbonosStr = pedido.abonos.map((a: any) =>
-              `<div style="font-size:0.97em; color:#444; margin-bottom:2px;">
-                ${a.tipo_pago.charAt(0).toUpperCase() + a.tipo_pago.slice(1)}: S/ ${Number(a.monto).toFixed(2)}
-              </div>`
-            ).join('');
-          } else {
-            this.modalAbonosStr = '';
+
+          if (pedido) {
+            // Cargar productos para selección
+            if (pedido.productos && Array.isArray(pedido.productos)) {
+              this.modalProductos = pedido.productos.map((p: any) => {
+                const pagado = p.pagado || false;
+                const cantidadPagada = p.cantidadPagada || 0;
+                const cantidadDisponible = p.cantidad - cantidadPagada;
+
+                return {
+                  ...p,
+                  cantidadPagada: cantidadPagada,
+                  cantidadDisponible: cantidadDisponible,
+                  cantidadSeleccionada: cantidadDisponible, // Por defecto seleccionar todo lo disponible
+                  selected: false,
+                  disabled: cantidadDisponible === 0
+                };
+              });
+            }
+
+            if (pedido.abonos && Array.isArray(pedido.abonos) && pedido.abonos.length > 0) {
+              const pagadoActual = pedido.abonos.reduce((sum: number, a: any) => sum + Number(a.monto), 0);
+              this.modalPagado = pagadoActual;
+              this.modalSaldoPendiente = mesa.monto - pagadoActual;
+              this.modalAbonosStr = pedido.abonos.map((a: any) =>
+                `<div style="font-size:0.97em; color:#444; margin-bottom:2px;">
+                  ${a.tipo_pago.charAt(0).toUpperCase() + a.tipo_pago.slice(1)}: S/ ${Number(a.monto).toFixed(2)}
+                </div>`
+              ).join('');
+            } else {
+              this.modalAbonosStr = '';
+            }
           }
         } catch (error) {
           console.error('Error al cargar detalles del pedido:', error);
         }
       }
-      
+
       this.showMesaModal = true;
+    }
+  }
+
+  // Variables para el nuevo modal de pago
+  modalProductos: any[] = [];
+  montoAbonoManual: string = '';
+
+  toggleProductoSelection(index: number): void {
+    const prod = this.modalProductos[index];
+    if (prod && !prod.disabled) {
+      prod.selected = !prod.selected;
+      // Reiniciar cantidad seleccionada al disponible si se selecciona
+      if (prod.selected) {
+        prod.cantidadSeleccionada = prod.cantidadDisponible;
+      }
+      this.calcularMontoSeleccionado();
+    }
+  }
+
+  updateCantidadSeleccionada(index: number, nuevaCantidad: number): void {
+    const prod = this.modalProductos[index];
+    if (prod && prod.selected) {
+      // Validar límites
+      if (nuevaCantidad < 1) nuevaCantidad = 1;
+      if (nuevaCantidad > prod.cantidadDisponible) nuevaCantidad = prod.cantidadDisponible;
+
+      prod.cantidadSeleccionada = nuevaCantidad;
+      this.calcularMontoSeleccionado();
+    }
+  }
+
+  calcularMontoSeleccionado(): void {
+    const totalSeleccionado = this.modalProductos
+      .filter(p => p.selected)
+      .reduce((sum, p) => sum + (p.precio * p.cantidadSeleccionada), 0);
+
+    if (totalSeleccionado > 0) {
+      this.montoAbonoManual = totalSeleccionado.toFixed(2);
+    } else {
+      this.montoAbonoManual = '';
+    }
+  }
+
+  appendKeypadNumber(num: string): void {
+    // Si hay productos seleccionados, limpiarlos al usar el teclado
+    if (this.modalProductos.some(p => p.selected)) {
+      this.modalProductos.forEach(p => p.selected = false);
+      this.montoAbonoManual = '';
+    }
+
+    if (num === '.') {
+      if (!this.montoAbonoManual.includes('.')) {
+        this.montoAbonoManual += num;
+      }
+    } else {
+      this.montoAbonoManual += num;
+    }
+  }
+
+  clearKeypadInput(): void {
+    this.montoAbonoManual = '';
+    this.modalProductos.forEach(p => p.selected = false);
+  }
+
+  backspaceKeypad(): void {
+    if (this.montoAbonoManual.length > 0) {
+      this.montoAbonoManual = this.montoAbonoManual.slice(0, -1);
+      this.modalProductos.forEach(p => p.selected = false);
     }
   }
 
   mostrarOpcionesMesa(mesa: any, event: MouseEvent): void {
     event.preventDefault();
     const baseNum = typeof mesa.numero === 'string' ? parseInt(mesa.numero.match(/^\d+/)?.[0] || mesa.numero) : mesa.numero;
-    
+
     this.modalType = mesa.dividida ? 'unir' : 'dividir';
     this.modalMesa = baseNum;
     this.modalBaseNum = baseNum;
@@ -680,10 +787,10 @@ export class HomeComponent implements OnInit {
     // Verificar si alguna de las sub-mesas tiene pedidos activos
     const mesaA = this.mesas.find(m => m.numero === `${baseNum}A`);
     const mesaB = this.mesas.find(m => m.numero === `${baseNum}B`);
-    
+
     const mesaAOcupada = mesaA && (mesaA.estado === this.MESA_ESTADOS.OCUPADA || mesaA.estado === this.MESA_ESTADOS.PARCIAL);
     const mesaBOcupada = mesaB && (mesaB.estado === this.MESA_ESTADOS.OCUPADA || mesaB.estado === this.MESA_ESTADOS.PARCIAL);
-    
+
     if (mesaAOcupada || mesaBOcupada) {
       let mensaje = 'No se puede unir la mesa porque ';
       if (mesaAOcupada && mesaBOcupada) {
@@ -694,11 +801,11 @@ export class HomeComponent implements OnInit {
         mensaje += 'la mesa ' + baseNum + 'B tiene un pedido activo.';
       }
       mensaje += ' Debe completar o anular los pedidos antes de unir las mesas.';
-      
+
       this.notificationService.error(mensaje);
       return;
     }
-    
+
     // Si ambas sub-mesas están libres, proceder con la unión
     delete this.mesasDivididas[baseNum];
     localStorage.setItem('mesasDivididas', JSON.stringify(this.mesasDivididas));
@@ -723,7 +830,7 @@ export class HomeComponent implements OnInit {
     this.mesaModalContent = '';
     this.modalType = '';
     this.selectedPaymentMethod = '';
-    
+
     // Limpiar variables del formulario de pedidos para evitar que persistan entre mesas
     this.pedidoDetalle = [];
     this.totalPedido = 0;
@@ -734,17 +841,20 @@ export class HomeComponent implements OnInit {
     this.montoDirecto = 0;
     this.showSugerencias = false;
     this.sugerenciasProductos = [];
-    
+
     // Resetear modo de edición
     this.editandoPedido = false;
     this.idPedidoEditando = null;
-    
+
     // Resetear variables de pedidos especiales
     this.nombreClienteEspecial = '';
     this.direccionEspecial = '';
     this.telefonoEspecial = '';
     this.montoEspecial = 0;
     this.observacionEspecial = '';
+
+    // Resetear estado de confirmación
+    this.confirmandoAnulacion = false;
   }
 
   selectPaymentMethod(method: string) {
@@ -752,12 +862,97 @@ export class HomeComponent implements OnInit {
   }
 
   async onAbonoSubmit(form: any) {
-    const formData = new FormData(form);
-    const abono = parseFloat(formData.get('abono') as string);
+    let abono: number = 0;
+
+    // Manejar diferentes tipos de objeto form (NgForm o HTMLFormElement)
+    if (form.value && form.value.abono) {
+      abono = parseFloat(form.value.abono);
+    } else if (form.get && typeof form.get === 'function') { // FormData
+      abono = parseFloat(form.get('abono') as string);
+    } else if (form instanceof HTMLFormElement) {
+      const formData = new FormData(form);
+      abono = parseFloat(formData.get('abono') as string);
+    } else if (this.montoAbonoManual) {
+      abono = parseFloat(this.montoAbonoManual.toString());
+    }
+
     const tipoPago = this.selectedPaymentMethod;
-    
-    if (abono && tipoPago && this.modalIdPedido) {
-      await this.abonarPedido(this.modalIdPedido, abono, tipoPago, this.modalMonto, this.modalPagado, this.modalMesa);
+
+    if (abono > 0 && tipoPago && this.modalIdPedido) {
+      // Validar que el monto no exceda el saldo pendiente (con margen de 0.01 por decimales)
+      if (abono > (this.modalSaldoPendiente + 0.01)) {
+        this.notificationService.error(`El monto ingresado (S/ ${abono.toFixed(2)}) excede el saldo pendiente (S/ ${this.modalSaldoPendiente.toFixed(2)})`);
+        return;
+      }
+
+      try {
+        // Identificar productos seleccionados para pagarlos con sus cantidades
+        const productosPagados: { index: number; cantidad: number; }[] = [];
+
+        this.modalProductos.forEach((prod, index) => {
+          if (prod.selected && !prod.disabled) {
+            // Usar la cantidad seleccionada por el usuario (o todo lo disponible por defecto)
+            const cantidadAPagar = prod.cantidadSeleccionada || prod.cantidadDisponible;
+
+            productosPagados.push({
+              index: index,
+              cantidad: cantidadAPagar
+            });
+          }
+        });
+
+        await this.dexieService.abonarPedido(this.modalIdPedido, abono, tipoPago, productosPagados);
+
+        // Emitir evento Socket.IO (Desactivado temporalmente por solicitud del usuario)
+        /* if (this.socketService.isConnected()) {
+          this.socketService.emit('pagoRealizado', {
+            mesa: this.modalMesa,
+            monto: abono,
+            metodoPago: tipoPago,
+            idPedido: this.modalIdPedido,
+            productosPagados: productosPagados // Ahora enviamos la estructura completa
+          });
+        } */
+
+        this.notificationService.success(`Abono de S/ ${abono.toFixed(2)} registrado (${tipoPago})`);
+
+        // Limpiar
+        this.montoAbonoManual = '';
+        this.modalProductos.forEach(p => p.selected = false);
+
+        // Recargar datos
+        // Primero obtener el pedido actualizado de la BD para tener los datos reales
+        const pedidoActualizado = await this.dexieService.getPedidoPorId(this.modalIdPedido);
+
+        if (pedidoActualizado) {
+          // Si ya está pagado completamente, cerrar o limpiar
+          if (pedidoActualizado.estado === 'pagado') {
+            await this.limpiarMesa(this.modalMesa.toString());
+            this.closeMesaModal();
+            this.notificationService.success('Pago completado. Mesa limpiada.');
+          } else {
+            // Si falta pagar, recargar el modal
+            const mesaInfo = {
+              numero: this.modalMesa,
+              idPedido: this.modalIdPedido,
+              monto: pedidoActualizado.monto,
+              pagado: pedidoActualizado.pagado,
+              dividida: false
+            };
+            // Llamar a clickMesa para refrescar el estado de los productos (cantidades disponibles, etc)
+            await this.clickMesa(mesaInfo);
+          }
+        }
+
+        this.renderMesas();
+        this.calcularTotales();
+
+      } catch (error) {
+        console.error('Error al registrar abono:', error);
+        this.notificationService.error('Error al registrar el abono');
+      }
+    } else {
+      this.notificationService.error('Datos incompletos para el pago');
     }
   }
 
@@ -773,11 +968,11 @@ export class HomeComponent implements OnInit {
 
   async mostrarFormularioPorPlato(num: string): Promise<void> {
     console.log('Mostrar formulario por plato para mesa:', num);
-    
+
     // Siempre resetear variables del pedido para evitar que persistan entre mesas
     // Solo mantener los datos si estamos editando el mismo pedido de la misma mesa
     const mismaMesaEditando = this.editandoPedido && this.modalMesa === num;
-    
+
     if (!mismaMesaEditando) {
       this.pedidoDetalle = [];
       this.totalPedido = 0;
@@ -787,18 +982,18 @@ export class HomeComponent implements OnInit {
         this.idPedidoEditando = null;
       }
     }
-    
+
     this.productoSeleccionado = null;
     this.productoInput = '';
     this.cantidadInput = 1;
     this.observacionInput = '';
     this.showSugerencias = false;
     this.sugerenciasProductos = [];
-    
+
     // Inicializar filtros
     this.categoriaSeleccionada = 'todos';
     await this.filtrarProductosPorCategoria();
-    
+
     // Configurar modal Angular - mantener el número completo con letra
     this.modalType = 'pedido-platos';
     this.modalMesa = num;
@@ -807,11 +1002,11 @@ export class HomeComponent implements OnInit {
 
   mostrarFormularioPorMonto(num: string): void {
     console.log('Mostrar formulario por monto para mesa:', num);
-    
+
     // Resetear variables
     this.montoDirecto = 0;
     this.observacionInput = '';
-    
+
     // Configurar modal Angular - mantener el número completo con letra
     this.modalType = 'pedido-monto';
     this.modalMesa = num;
@@ -821,22 +1016,22 @@ export class HomeComponent implements OnInit {
   async abonarPedido(idPedido: number, abono: number, tipoPago: string, monto: number, pagadoActual: number, num: string): Promise<void> {
     // Validar que el abono no sea mayor al saldo pendiente
     const saldoPendiente = monto - pagadoActual;
-    
+
     if (abono > saldoPendiente) {
       this.notificationService.error('El monto no puede ser mayor al saldo pendiente');
       return;
     }
-    
+
     try {
       await this.dexieService.abonarPedido(idPedido, abono, tipoPago);
       this.notificationService.success('Abono registrado correctamente');
-      
+
       // Actualizar los datos del modal inmediatamente
       const pedidoActualizado = await this.dexieService.getPedidoPorId(idPedido);
       if (pedidoActualizado) {
         this.modalPagado = pedidoActualizado.pagado || 0;
         this.modalSaldoPendiente = this.modalMonto - this.modalPagado;
-        
+
         // Actualizar el detalle de abonos
         if (pedidoActualizado.abonos && Array.isArray(pedidoActualizado.abonos) && pedidoActualizado.abonos.length > 0) {
           this.modalAbonosStr = pedidoActualizado.abonos.map((a: any) =>
@@ -845,7 +1040,7 @@ export class HomeComponent implements OnInit {
             </div>`
           ).join('');
         }
-        
+
         // Si el pago está completo, limpiar la mesa
         if (this.modalSaldoPendiente <= 0) {
           await this.limpiarMesa(num);
@@ -853,7 +1048,7 @@ export class HomeComponent implements OnInit {
           this.notificationService.success('Pago completado. Mesa limpiada y lista para nuevos clientes.');
         }
       }
-      
+
       await this.renderMesas();
       await this.calcularTotales();
       await this.cargarHistorialPagados();
@@ -872,24 +1067,36 @@ export class HomeComponent implements OnInit {
     this.showMesaModal = true;
   }
 
+  // Estado para controlar la confirmación de anulación
+  confirmandoAnulacion: boolean = false;
+
+  iniciarAnulacion(): void {
+    this.confirmandoAnulacion = true;
+  }
+
+  cancelarAnulacion(): void {
+    this.confirmandoAnulacion = false;
+  }
+
   async anularPedido(idPedido: number | null, num: string): Promise<void> {
     if (!idPedido) {
       this.notificationService.error('No se encontró un pedido válido para anular');
       return;
     }
-    
-    if (confirm('¿Está seguro de anular este pedido?')) {
-      try {
-        await this.dexieService.anularPedido(idPedido);
-        await this.limpiarMesa(num);
-        this.notificationService.success('Pedido anulado correctamente. Mesa limpiada y lista para nuevos clientes.');
-        this.closeMesaModal();
-        await this.renderMesas();
-        await this.calcularTotales();
-      } catch (error) {
-        console.error('Error al anular pedido:', error);
-        this.notificationService.error('Error al anular el pedido');
-      }
+
+    try {
+      await this.dexieService.anularPedido(idPedido);
+      await this.limpiarMesa(num);
+
+      this.notificationService.success('Pedido anulado correctamente. Mesa limpiada.');
+      this.closeMesaModal();
+      this.confirmandoAnulacion = false; // Resetear estado
+
+      await this.renderMesas();
+      await this.calcularTotales();
+    } catch (error) {
+      console.error('Error al anular pedido:', error);
+      this.notificationService.error('Error al anular el pedido');
     }
   }
 
@@ -909,29 +1116,29 @@ export class HomeComponent implements OnInit {
       this.montoDirecto = 0;
       this.showSugerencias = false;
       this.sugerenciasProductos = [];
-      
+
       // Resetear variables del modal
       this.modalMonto = 0;
       this.modalPagado = 0;
       this.modalSaldoPendiente = 0;
       this.modalAbonosStr = '';
       this.modalIdPedido = null;
-      
+
       // Resetear modo de edición si estaba activo
       this.editandoPedido = false;
       this.idPedidoEditando = null;
-      
+
       // Limpiar elementos del DOM si existen
       const platosDiv = document.getElementById('platosSeleccionados');
       if (platosDiv) {
         platosDiv.innerHTML = '';
       }
-      
+
       const totalSpan = document.getElementById('totalPedido');
       if (totalSpan) {
         totalSpan.textContent = '0.00';
       }
-      
+
       console.log(`Mesa ${num} limpiada correctamente`);
     } catch (error) {
       console.error('Error al limpiar mesa:', error);
@@ -943,7 +1150,7 @@ export class HomeComponent implements OnInit {
       this.notificationService.error('No se encontró un pedido válido para mostrar la precuenta');
       return;
     }
-    
+
     try {
       const pedido = await this.dexieService.getPedidoPorId(idPedido);
       if (pedido) {
@@ -963,7 +1170,7 @@ export class HomeComponent implements OnInit {
             <strong>Mozo:</strong> ${pedido.mozo || 'No asignado'}
           </div>
         `;
-        
+
         // Mostrar en modal o imprimir
         if (confirm('¿Desea imprimir la precuenta?')) {
           const ventanaImpresion = window.open('', '_blank');
@@ -994,23 +1201,23 @@ export class HomeComponent implements OnInit {
   async editarPedidoModal(idPedido: number | null, num: string): Promise<void> {
     console.log('editarPedidoModal llamado con:', { idPedido, num });
     console.log('modalIdPedido actual:', this.modalIdPedido);
-    
+
     if (!idPedido) {
       console.log('Error: idPedido es null o undefined');
       this.notificationService.error('No se encontró un pedido válido para editar');
       return;
     }
-    
+
     try {
       const pedido = await this.dexieService.getPedidoPorId(idPedido);
       if (pedido) {
         // Configurar modo de edición
         this.editandoPedido = true;
         this.idPedidoEditando = idPedido;
-        
+
         // Siempre mostrar formulario por platos para agregar más productos
         this.mostrarFormularioPorPlato(num);
-        
+
         // Pre-cargar los platos existentes si los hay
         setTimeout(() => {
           try {
@@ -1026,7 +1233,7 @@ export class HomeComponent implements OnInit {
               // Fallback: parsear los detalles con el formato actual para pedidos por platos
               const lineas = pedido.detalles.split('\n');
               this.pedidoDetalle = [];
-              
+
               for (const linea of lineas) {
                 // Formato: "1. Nombre (cantidadx) - S/ precio = S/ subtotal"
                 const match = linea.match(/\d+\. (.+) \((\d+)x\) - S\/ ([\d.]+) = S\/ [\d.]+/);
@@ -1043,13 +1250,13 @@ export class HomeComponent implements OnInit {
               // Para pedidos por monto, inicializar vacío para agregar platos
               this.pedidoDetalle = [];
             }
-            
+
             this.calcularTotalPlatos();
           } catch (error) {
             console.error('Error al parsear detalles del pedido:', error);
           }
         }, 100);
-        
+
         this.notificationService.info('Agregando platos al pedido existente');
       } else {
         this.notificationService.error('Pedido no encontrado');
@@ -1068,11 +1275,11 @@ export class HomeComponent implements OnInit {
       this.showMesaModal = true;
       return;
     }
-    
+
     this.closeMesaModal();
-    
+
     const mesaStr = mesa.toString();
-    
+
     if (tipo === 'platos') {
       this.mostrarFormularioPorPlato(mesaStr);
     } else if (tipo === 'monto') {
@@ -1083,51 +1290,51 @@ export class HomeComponent implements OnInit {
   async agregarPlato(): Promise<void> {
     const nombre = this.productoInput.trim();
     const cantidad = this.cantidadInput || 1;
-    
+
     if (!nombre) {
       this.notificationService.error('Debe ingresar el nombre del producto');
       return;
     }
-    
+
     if (cantidad <= 0) {
       this.notificationService.error('La cantidad debe ser mayor a 0');
       return;
     }
-    
+
     try {
       // Obtener productos actualizados del catálogo
       const productos = await this.catalogoService.getProductos();
-      
+
       // Buscar el producto en el catálogo (búsqueda exacta o similar)
-      let producto = productos.find(p => 
+      let producto = productos.find(p =>
         p.nombre.toLowerCase() === nombre.toLowerCase() && p.disponible
       );
-      
+
       // Si no se encuentra exacto, buscar coincidencia parcial
       if (!producto) {
-        producto = productos.find(p => 
+        producto = productos.find(p =>
           p.nombre.toLowerCase().includes(nombre.toLowerCase()) && p.disponible
         );
       }
-      
+
       // Si aún no se encuentra, usar el producto seleccionado del autocompletado
       if (!producto && this.productoSeleccionado) {
         producto = this.productoSeleccionado;
       }
-      
+
       if (!producto) {
         this.notificationService.error('Producto no encontrado en el catálogo o no disponible');
         return;
       }
-      
+
       if (!producto.disponible) {
         this.notificationService.error('El producto no está disponible');
         return;
       }
-      
+
       // Verificar si el producto ya está en el pedido
       const existente = this.pedidoDetalle.find(p => p.id === producto.id);
-      
+
       if (existente) {
         existente.cantidad += cantidad;
         this.notificationService.info(`Cantidad actualizada: ${existente.nombre} (${existente.cantidad})`);
@@ -1138,16 +1345,16 @@ export class HomeComponent implements OnInit {
         });
         this.notificationService.success(`Producto agregado: ${producto.nombre} (${cantidad})`);
       }
-      
+
       // Limpiar inputs
       this.productoInput = '';
       this.cantidadInput = 1;
       this.productoSeleccionado = null;
       this.ocultarSugerenciasProductos();
-      
+
       // Recalcular total
       this.calcularTotalPlatos();
-      
+
       // Enfocar nuevamente el campo de producto para agregar más
       setTimeout(() => {
         const productoInput = document.getElementById('productoInput') as HTMLInputElement;
@@ -1155,7 +1362,7 @@ export class HomeComponent implements OnInit {
           productoInput.focus();
         }
       }, 100);
-      
+
     } catch (error) {
       console.error('Error al agregar producto:', error);
       this.notificationService.error('Error al agregar el producto');
@@ -1166,31 +1373,31 @@ export class HomeComponent implements OnInit {
     const buscarInput = document.getElementById('buscarProducto') as HTMLInputElement;
     const cantidadInput = document.getElementById('cantidadProducto') as HTMLInputElement;
     const platosDiv = document.getElementById('platosSeleccionados');
-    
+
     if (!buscarInput || !cantidadInput || !platosDiv) return;
-    
+
     const nombreProducto = buscarInput.value.trim();
     const cantidad = parseInt(cantidadInput.value) || 1;
-    
+
     if (!nombreProducto) {
       this.notificationService.error('Por favor ingrese el nombre del producto');
       return;
     }
-    
+
     // Buscar el producto en el catálogo para obtener el precio
     this.catalogoService.getProductos().then(productos => {
-      const producto = productos.find(p => 
+      const producto = productos.find(p =>
         p.nombre.toLowerCase().includes(nombreProducto.toLowerCase()) && p.disponible
       );
-      
+
       const precio = producto ? producto.precio : 0;
       const subtotal = precio * cantidad;
-      
+
       const fila = document.createElement('tr');
       fila.dataset['producto'] = nombreProducto;
       fila.dataset['precio'] = producto['precio']?.toString() || '0';
       fila.dataset['cantidad'] = cantidad.toString();
-      
+
       fila.innerHTML = `
         <td style="padding: 8px; border: 1px solid #ddd;">${nombreProducto}</td>
         <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${cantidad}</td>
@@ -1201,22 +1408,22 @@ export class HomeComponent implements OnInit {
                   style="background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 12px;">×</button>
         </td>
       `;
-      
+
       // Agregar evento para eliminar
       const btnEliminar = fila.querySelector('.btn-eliminar-producto');
       if (btnEliminar) {
         btnEliminar.addEventListener('click', this.eliminarProductoEvent);
       }
-      
+
       platosDiv.appendChild(fila);
-      
+
       // Limpiar campos
       buscarInput.value = '';
       cantidadInput.value = '1';
-      
+
       // Recalcular total
       this.calcularTotalPlatosModerno();
-      
+
       if (!producto) {
         this.notificationService.warning(`Producto "${nombreProducto}" no encontrado en catálogo. Precio establecido en S/ 0.00`);
       }
@@ -1225,18 +1432,18 @@ export class HomeComponent implements OnInit {
 
   configurarBusquedaProductos(input: HTMLInputElement): void {
     let timeoutId: any;
-    
+
     input.addEventListener('input', () => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
         const query = input.value.toLowerCase().trim();
-        
+
         if (query.length >= 2) {
           this.catalogoService.getProductos().then(productos => {
             const productosCoincidentes = productos
               .filter(p => p.nombre.toLowerCase().includes(query) && p.disponible)
               .slice(0, 5);
-            
+
             this.mostrarSugerenciasProductos(productosCoincidentes, input);
           });
         } else {
@@ -1244,7 +1451,7 @@ export class HomeComponent implements OnInit {
         }
       }, 300);
     });
-    
+
     // Ocultar sugerencias al hacer clic fuera
     document.addEventListener('click', (e) => {
       if (!input.contains(e.target as Node)) {
@@ -1255,9 +1462,9 @@ export class HomeComponent implements OnInit {
 
   mostrarSugerenciasProductos(productos: any[], input: HTMLInputElement): void {
     this.ocultarSugerenciasProductos();
-    
+
     if (productos.length === 0) return;
-    
+
     const sugerenciasDiv = document.createElement('div');
     sugerenciasDiv.id = 'sugerenciasProductos';
     sugerenciasDiv.style.cssText = `
@@ -1273,7 +1480,7 @@ export class HomeComponent implements OnInit {
       z-index: 1000;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     `;
-    
+
     productos.forEach(producto => {
       const item = document.createElement('div');
       item.style.cssText = `
@@ -1283,28 +1490,28 @@ export class HomeComponent implements OnInit {
         display: flex;
         justify-content: space-between;
       `;
-      
+
       item.innerHTML = `
         <span>${producto.nombre}</span>
         <span style="color: #28a745; font-weight: 500;">S/ ${producto.precio.toFixed(2)}</span>
       `;
-      
+
       item.addEventListener('mouseenter', () => {
         item.style.backgroundColor = '#f8f9fa';
       });
-      
+
       item.addEventListener('mouseleave', () => {
         item.style.backgroundColor = 'white';
       });
-      
+
       item.addEventListener('click', () => {
         input.value = producto.nombre;
         this.ocultarSugerenciasProductos();
       });
-      
+
       sugerenciasDiv.appendChild(item);
     });
-    
+
     // Posicionar relativo al input
     const inputParent = input.parentElement;
     if (inputParent) {
@@ -1333,7 +1540,7 @@ export class HomeComponent implements OnInit {
     this.productoInput = producto.nombre;
     this.showSugerencias = false;
     this.sugerenciasProductos = [];
-    
+
     // Enfocar el campo de cantidad después de seleccionar un producto
     setTimeout(() => {
       const cantidadInput = document.getElementById('cantidadInput') as HTMLInputElement;
@@ -1349,17 +1556,17 @@ export class HomeComponent implements OnInit {
     this.selectedSuggestionIndex = -1; // Resetear selección
     this.buscarProductos(value);
   }
-  
+
   // Configurar eventos de teclado para navegación en autocompletado
   configurarEventosTeclado(): void {
     document.addEventListener('keydown', (event) => {
       if (!this.showSugerencias || this.sugerenciasProductos.length === 0) return;
-      
+
       const activeElement = document.activeElement;
       const isProductInput = activeElement && activeElement.id === 'productoInput';
-      
+
       if (!isProductInput) return;
-      
+
       switch (event.key) {
         case 'ArrowDown':
           event.preventDefault();
@@ -1369,7 +1576,7 @@ export class HomeComponent implements OnInit {
           );
           this.actualizarSeleccionVisual();
           break;
-          
+
         case 'ArrowUp':
           event.preventDefault();
           this.selectedSuggestionIndex = Math.max(
@@ -1378,7 +1585,7 @@ export class HomeComponent implements OnInit {
           );
           this.actualizarSeleccionVisual();
           break;
-          
+
         case 'Enter':
           event.preventDefault();
           if (this.selectedSuggestionIndex >= 0 && this.selectedSuggestionIndex < this.sugerenciasProductos.length) {
@@ -1391,14 +1598,14 @@ export class HomeComponent implements OnInit {
             this.agregarPlato();
           }
           break;
-          
+
         case 'Escape':
           this.ocultarSugerenciasProductos();
           break;
       }
     });
   }
-  
+
   // Actualizar la selección visual en las sugerencias
   actualizarSeleccionVisual(): void {
     setTimeout(() => {
@@ -1425,26 +1632,26 @@ export class HomeComponent implements OnInit {
     try {
       // Obtener productos del catálogo
       const productos = await this.catalogoService.getProductos();
-      
+
       // Filtrar productos disponibles que coincidan con la búsqueda
       this.sugerenciasProductos = productos
         .filter(p => {
           if (!p.disponible) return false;
-          
+
           const nombreLower = p.nombre.toLowerCase();
           const queryLower = query.toLowerCase();
-          
+
           // Buscar coincidencias al inicio del nombre (prioridad alta)
           if (nombreLower.startsWith(queryLower)) return true;
-          
+
           // Buscar coincidencias en cualquier parte del nombre
           if (nombreLower.includes(queryLower)) return true;
-          
+
           // Buscar por palabras individuales
           const palabrasQuery = queryLower.split(' ');
           const palabrasNombre = nombreLower.split(' ');
-          
-          return palabrasQuery.every(palabra => 
+
+          return palabrasQuery.every(palabra =>
             palabrasNombre.some((nombrePalabra: string) => nombrePalabra.includes(palabra))
           );
         })
@@ -1452,15 +1659,28 @@ export class HomeComponent implements OnInit {
           // Ordenar por relevancia: primero los que empiezan con la query
           const aStartsWith = a.nombre.toLowerCase().startsWith(query.toLowerCase());
           const bStartsWith = b.nombre.toLowerCase().startsWith(query.toLowerCase());
-          
+
           if (aStartsWith && !bStartsWith) return -1;
           if (!aStartsWith && bStartsWith) return 1;
-          
+
           // Luego ordenar alfabéticamente
           return a.nombre.localeCompare(b.nombre);
-        })
-        .slice(0, 8); // Mostrar máximo 8 sugerencias
-      
+        });
+
+      // Deduplicar resultados (por nombre, ignorando mayúsculas/minúsculas)
+      const uniqueNames = new Set<string>();
+      this.sugerenciasProductos = this.sugerenciasProductos.filter(p => {
+        const normalizedName = p.nombre.trim().toLowerCase();
+        if (uniqueNames.has(normalizedName)) {
+          return false;
+        }
+        uniqueNames.add(normalizedName);
+        return true;
+      });
+
+      // Limitar a 8 sugerencias después de deduplicar
+      this.sugerenciasProductos = this.sugerenciasProductos.slice(0, 8);
+
       this.showSugerencias = this.sugerenciasProductos.length > 0;
     } catch (error) {
       console.error('Error al buscar productos:', error);
@@ -1473,13 +1693,13 @@ export class HomeComponent implements OnInit {
     this.pedidoDetalle.splice(index, 1);
     this.calcularTotalPlatos();
   }
-  
+
   // Método para cambiar categoría seleccionada
   cambiarCategoriaFiltro(categoria: string): void {
     this.categoriaSeleccionada = categoria;
     this.filtrarProductosPorCategoria();
   }
-  
+
   // Método para filtrar productos por categoría
   async filtrarProductosPorCategoria(): Promise<void> {
     try {
@@ -1495,7 +1715,7 @@ export class HomeComponent implements OnInit {
       this.productosFiltrados = [];
     }
   }
-  
+
   // Método para editar cantidad directamente
   editarCantidad(index: number, nuevaCantidad: number): void {
     if (nuevaCantidad > 0) {
@@ -1503,13 +1723,13 @@ export class HomeComponent implements OnInit {
       this.calcularTotalPlatos();
     }
   }
-  
+
   // Método para aumentar cantidad
   aumentarCantidad(index: number): void {
     this.pedidoDetalle[index].cantidad += 1;
     this.calcularTotalPlatos();
   }
-  
+
   // Método para disminuir cantidad
   disminuirCantidad(index: number): void {
     if (this.pedidoDetalle[index].cantidad > 1) {
@@ -1517,12 +1737,12 @@ export class HomeComponent implements OnInit {
       this.calcularTotalPlatos();
     }
   }
-  
+
   // Método para agregar producto desde filtros
   agregarProductoDesdeCategoria(producto: any): void {
     // Verificar si el producto ya está en el pedido
     const existente = this.pedidoDetalle.find(p => p.id === producto.id);
-    
+
     if (existente) {
       existente.cantidad += 1;
       this.notificationService.info(`Cantidad actualizada: ${existente.nombre} (${existente.cantidad})`);
@@ -1533,25 +1753,25 @@ export class HomeComponent implements OnInit {
       });
       this.notificationService.success(`Producto agregado: ${producto.nombre}`);
     }
-    
+
     this.calcularTotalPlatos();
   }
 
   calcularTotalPlatosModerno(): void {
     const platosDiv = document.getElementById('platosSeleccionados');
     const totalSpan = document.getElementById('totalPedido');
-    
+
     if (!platosDiv || !totalSpan) return;
-    
+
     let total = 0;
     const filas = platosDiv.querySelectorAll('tr');
-    
+
     filas.forEach((fila: any) => {
       const precio = parseFloat(fila.dataset.precio) || 0;
       const cantidad = parseInt(fila.dataset.cantidad) || 0;
       total += precio * cantidad;
     });
-    
+
     totalSpan.textContent = total.toFixed(2);
   }
 
@@ -1568,7 +1788,7 @@ export class HomeComponent implements OnInit {
     this.totalPedido = this.pedidoDetalle.reduce((total, item) => {
       return total + (item.precio * item.cantidad);
     }, 0);
-    
+
     // También actualizar el DOM si existe
     const totalSpan = document.getElementById('totalPedido');
     if (totalSpan) {
@@ -1582,18 +1802,18 @@ export class HomeComponent implements OnInit {
       this.notificationService.error('Debe agregar al menos un producto');
       return;
     }
-    
+
     let detalles = '';
     let total = 0;
     const productos: any[] = [];
-    
+
     // Procesar productos del pedido usando las variables de Angular
     this.pedidoDetalle.forEach((item, index) => {
       const subtotal = item.precio * item.cantidad;
-      
+
       detalles += `${index + 1}. ${item.nombre} (${item.cantidad}x) - S/ ${item.precio.toFixed(2)} = S/ ${subtotal.toFixed(2)}\n`;
       total += subtotal;
-      
+
       productos.push({
         id: item.id || `temp_${index}`,
         nombre: item.nombre,
@@ -1603,16 +1823,16 @@ export class HomeComponent implements OnInit {
         listo: false
       });
     });
-    
+
     // Agregar observación si existe
     const observacion = this.observacionInput?.trim();
     if (observacion) {
       detalles += `\nObservación: ${observacion}`;
     }
-    
+
     try {
       const fecha = new Date();
-      
+
       if (this.editandoPedido && this.idPedidoEditando) {
         // Modo edición: actualizar pedido existente
         const pedidoExistente = await this.dexieService.getPedidoPorId(this.idPedidoEditando);
@@ -1626,12 +1846,12 @@ export class HomeComponent implements OnInit {
             modificado_por: this.usuarioActual?.nombre || 'Sistema',
             fecha_modificacion: fecha.toISOString()
           };
-          
+
           await this.dexieService.actualizarPedido(this.idPedidoEditando, pedidoActualizado);
-          
+
           this.notificationService.success(`Pedido actualizado para mesa ${num} - Total: S/ ${total.toFixed(2)}`);
         }
-        
+
         // Resetear modo edición
         this.editandoPedido = false;
         this.idPedidoEditando = null;
@@ -1657,20 +1877,21 @@ export class HomeComponent implements OnInit {
         };
 
         const idPedido = await this.dexieService.agregarPedido(pedido);
-        
+
         // Enviar notificación via socket si está disponible
-        if (this.socketService.isConnected()) {
+        // Enviar notificación via socket si está disponible (Desactivado)
+        /* if (this.socketService.isConnected()) {
           this.socketService.emit('nuevoPedido', {
             mesa: num,
             tipo_pedido: 'mesa',
             id: idPedido,
             productos: productos
           });
-        }
-        
+        } */
+
         this.notificationService.success(`Pedido registrado para mesa ${num} - Total: S/ ${total.toFixed(2)}`);
       }
-      
+
       this.closeMesaModal();
       await this.renderMesas();
       await this.calcularTotales();
@@ -1692,7 +1913,7 @@ export class HomeComponent implements OnInit {
 
     try {
       const fecha = new Date();
-      
+
       // Verificar si estamos editando un pedido existente
       if (this.editandoPedido && this.idPedidoEditando) {
         // Actualizar pedido existente
@@ -1714,7 +1935,7 @@ export class HomeComponent implements OnInit {
 
         await this.dexieService.actualizarPedido(this.idPedidoEditando, pedidoActualizado);
         this.notificationService.success(`Pedido actualizado para mesa ${num} - Total: S/ ${monto.toFixed(2)}`);
-        
+
         // Resetear modo de edición
         this.editandoPedido = false;
         this.idPedidoEditando = null;
@@ -1747,20 +1968,21 @@ export class HomeComponent implements OnInit {
         };
 
         const idPedido = await this.dexieService.agregarPedido(pedido);
-        
+
         // Enviar notificación via socket si está disponible
-        if (this.socketService.isConnected()) {
+        // Enviar notificación via socket si está disponible (Desactivado)
+        /* if (this.socketService.isConnected()) {
           this.socketService.emit('nuevoPedido', {
             mesa: num,
             tipo_pedido: 'mesa',
             id: idPedido,
             monto: monto
           });
-        }
-        
+        } */
+
         this.notificationService.success(`Pedido registrado para mesa ${num} - Total: S/ ${monto.toFixed(2)}`);
       }
-      
+
       this.closeMesaModal();
       await this.renderMesas();
       await this.calcularTotales();
@@ -1780,13 +2002,13 @@ export class HomeComponent implements OnInit {
     this.modalType = 'delivery';
     this.showMesaModal = true;
   }
-  
+
   establecerCajaApertura(monto: number): void {
     if (monto <= 0) {
       alert('El monto debe ser mayor a 0');
       return;
     }
-    
+
     const fechaHoy = new Date().toISOString().split('T')[0];
     const cajaInicial = {
       fecha: fechaHoy,
@@ -1797,14 +2019,14 @@ export class HomeComponent implements OnInit {
       total: 0,
       ganancia: 0
     };
-    
+
     this.dexieService.iniciarCaja(cajaInicial).then(() => {
       this.cajaApertura = monto;
       this.calcularTotales();
       this.notificationService.success('Caja inicial establecida correctamente');
     });
   }
-  
+
   // Variables para manejo de reconexión y heartbeat
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
@@ -1824,7 +2046,7 @@ export class HomeComponent implements OnInit {
       this.iniciarHeartbeat();
       this.procesarColaEventos();
     });
-    
+
     this.socketService.listen('disconnect').subscribe(() => {
       console.log('Desconectado del servidor Socket.IO');
       this.notificationService.warning('Desconectado del servidor');
@@ -1850,7 +2072,7 @@ export class HomeComponent implements OnInit {
       console.log('Producto actualizado:', producto);
       this.sincronizarInventario({ productos: [producto] });
     });
-    
+
     // Eventos para caja
     if (this.authService.isCaja()) {
       this.socketService.listen('nuevoPedido').subscribe((pedido) => {
@@ -1865,14 +2087,14 @@ export class HomeComponent implements OnInit {
         }
         this.sincronizarDatos();
       });
-      
+
       this.socketService.listen('nuevoPedidoEspecial').subscribe((pedido) => {
         this.notificationService.success(
           `Nuevo pedido ${pedido.tipo} recibido - Cliente: ${pedido.cliente}`
         );
         this.sincronizarDatos();
       });
-      
+
       this.socketService.listen('pagoRealizado').subscribe((pago) => {
         if (pago.tipo === 'especial') {
           this.notificationService.success(
@@ -1885,14 +2107,14 @@ export class HomeComponent implements OnInit {
         }
         this.sincronizarDatos();
       });
-      
+
       this.socketService.listen('pedidoEspecialAnulado').subscribe((pedido) => {
         this.notificationService.info(
           `Pedido anulado - Cliente: ${pedido.cliente}`
         );
         this.sincronizarDatos();
       });
-      
+
       this.socketService.listen('pedidoListo').subscribe((pedido) => {
         this.notificationService.success(
           `Pedido listo para entrega - Mesa ${pedido.mesa}`
@@ -1912,7 +2134,7 @@ export class HomeComponent implements OnInit {
         this.totalDia = total;
       });
     }
-    
+
     // Eventos para mozo
     if (this.authService.isMoso()) {
       this.socketService.listen('respuestaCaja').subscribe((respuesta) => {
@@ -1921,7 +2143,7 @@ export class HomeComponent implements OnInit {
         );
         this.sincronizarDatos();
       });
-      
+
       this.socketService.listen('pedidoAprobado').subscribe((pedido) => {
         this.notificationService.success(
           `Pedido aprobado - Mesa ${pedido.mesa}`
@@ -1929,7 +2151,7 @@ export class HomeComponent implements OnInit {
         this.sincronizarDatos();
       });
     }
-    
+
     // Eventos para cocina
     if (this.authService.isCocina()) {
       this.socketService.listen('pedidoRecibido').subscribe((pedido) => {
@@ -1939,7 +2161,7 @@ export class HomeComponent implements OnInit {
         this.reproducirSonidoNuevoPedido();
         this.sincronizarDatos();
       });
-      
+
       this.socketService.listen('pedidoCancelado').subscribe((pedido) => {
         this.notificationService.warning(
           `Pedido cancelado - Mesa ${pedido.mesa}`
@@ -1964,13 +2186,13 @@ export class HomeComponent implements OnInit {
         );
       });
     }
-    
+
     // Eventos generales para todos los usuarios
     this.socketService.listen('estadoMesaActualizado').subscribe((mesa) => {
       console.log('Estado de mesa actualizado:', mesa);
       this.actualizarEstadoMesa(mesa);
     });
-    
+
     this.socketService.listen('sincronizarDatos').subscribe(() => {
       console.log('Solicitud de sincronización recibida');
       this.sincronizarDatos();
@@ -2028,7 +2250,7 @@ export class HomeComponent implements OnInit {
    */
   actualizarMesasDesdeObservable(mesasActualizadas: any[]): void {
     console.log('📋 Actualizando mesas desde observable:', mesasActualizadas);
-    
+
     // Actualizar el estado de las mesas
     mesasActualizadas.forEach(mesaActualizada => {
       const mesaIndex = this.mesas.findIndex(mesa => mesa.numero === mesaActualizada.numero);
@@ -2040,14 +2262,14 @@ export class HomeComponent implements OnInit {
         this.mesas.push(mesaActualizada);
       }
     });
-    
+
     // Re-renderizar las mesas para reflejar los cambios
     this.renderMesas();
-    
+
     // Detectar cambios para actualizar la vista
     this.cdr.detectChanges();
   }
-  
+
   exportarBD(): void {
     this.dexieService.exportarDB().then((data: any) => {
       const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
@@ -2061,11 +2283,11 @@ export class HomeComponent implements OnInit {
       URL.revokeObjectURL(url);
     });
   }
-  
+
   importarBD(event: any): void {
     const file = event.target.files[0];
     if (!file) return;
-    
+
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -2081,7 +2303,7 @@ export class HomeComponent implements OnInit {
     };
     reader.readAsText(file);
   }
-  
+
   limpiarBD(): void {
     if (confirm('¿Está seguro de limpiar la base de datos? Esta acción no se puede deshacer.')) {
       this.dexieService.limpiarDB().then(() => {
@@ -2164,7 +2386,7 @@ export class HomeComponent implements OnInit {
   telefonoEspecial: string = '';
   montoEspecial: number = 0;
   observacionEspecial: string = '';
-  
+
   // Variables para pago de pedidos especiales
   pedidoEspecialSeleccionado: any = null;
   montoAbonoPedidoEspecial: number = 0;
@@ -2176,27 +2398,27 @@ export class HomeComponent implements OnInit {
     this.montoEspecial = 0;
     this.observacionEspecial = '';
   }
-  
+
   async procesarPagoPedidoEspecial(): Promise<void> {
     if (!this.pedidoEspecialSeleccionado || !this.selectedPaymentMethod || this.montoAbonoPedidoEspecial <= 0) {
       this.notificationService.error('Debe completar todos los campos');
       return;
     }
-    
+
     const saldoPendiente = this.pedidoEspecialSeleccionado.monto - (this.pedidoEspecialSeleccionado.pagado || 0);
-    
+
     if (this.montoAbonoPedidoEspecial > saldoPendiente) {
       this.notificationService.error('El monto no puede ser mayor al saldo pendiente');
       return;
     }
-    
+
     try {
       await this.dexieService.abonarPedidoEspecial(
-        this.pedidoEspecialSeleccionado.id, 
-        this.montoAbonoPedidoEspecial, 
+        this.pedidoEspecialSeleccionado.id,
+        this.montoAbonoPedidoEspecial,
         this.selectedPaymentMethod
       );
-      
+
       // Emitir evento Socket.IO para sincronización
       this.socketService.emit('pagoRealizado', {
         tipo: 'especial',
@@ -2208,16 +2430,16 @@ export class HomeComponent implements OnInit {
         hora: new Date().toLocaleTimeString(),
         usuario: this.usuarioActual?.nombre || 'Usuario'
       });
-      
+
       this.notificationService.success('Pago registrado correctamente');
       this.closeMesaModal();
-      
+
       // Actualizar las listas
       await this.cargarPedidosParaLlevar();
       await this.cargarPedidosDelivery();
       await this.calcularTotales();
       await this.cargarHistorialPagados();
-      
+
     } catch (error) {
       console.error('Error al procesar pago:', error);
       this.notificationService.error('Error al procesar el pago');
@@ -2225,51 +2447,51 @@ export class HomeComponent implements OnInit {
   }
 
   async anularPedidoEspecial(pedido: any): Promise<void> {
-     if (!pedido || !pedido.id) {
-       this.notificationService.error('Pedido no válido');
-       return;
-     }
- 
-     try {
-       await this.dexieService.anularPedidoEspecial(pedido.id);
-       
-       // Emitir evento Socket.IO para sincronización
-       this.socketService.emit('pedidoEspecialAnulado', {
-         id: pedido.id,
-         tipo: pedido.tipo,
-         cliente: pedido.cliente,
-         monto: pedido.monto,
-         fecha: new Date().toISOString().split('T')[0],
-         hora: new Date().toLocaleTimeString(),
-         usuario: this.usuarioActual?.nombre || 'Usuario'
-       });
-       
-       this.notificationService.success('Pedido anulado correctamente');
-       
-       // Actualizar las listas
-       await this.cargarPedidosParaLlevar();
-       await this.cargarPedidosDelivery();
-       await this.calcularTotales();
-       
-     } catch (error) {
-       console.error('Error al anular pedido:', error);
-       this.notificationService.error('Error al anular el pedido');
-     }
-   }
+    if (!pedido || !pedido.id) {
+      this.notificationService.error('Pedido no válido');
+      return;
+    }
 
-   async sincronizarDatos(): Promise<void> {
-     try {
-       await this.cargarDatos();
-       await this.cargarPedidosParaLlevar();
-       await this.cargarPedidosDelivery();
-       await this.cargarHistorialPagados();
-       await this.calcularTotales();
-       await this.renderMesas();
-       this.cdr.detectChanges();
-     } catch (error) {
-       console.error('Error al sincronizar datos:', error);
-     }
-   }
+    try {
+      await this.dexieService.anularPedidoEspecial(pedido.id);
+
+      // Emitir evento Socket.IO para sincronización
+      this.socketService.emit('pedidoEspecialAnulado', {
+        id: pedido.id,
+        tipo: pedido.tipo,
+        cliente: pedido.cliente,
+        monto: pedido.monto,
+        fecha: new Date().toISOString().split('T')[0],
+        hora: new Date().toLocaleTimeString(),
+        usuario: this.usuarioActual?.nombre || 'Usuario'
+      });
+
+      this.notificationService.success('Pedido anulado correctamente');
+
+      // Actualizar las listas
+      await this.cargarPedidosParaLlevar();
+      await this.cargarPedidosDelivery();
+      await this.calcularTotales();
+
+    } catch (error) {
+      console.error('Error al anular pedido:', error);
+      this.notificationService.error('Error al anular el pedido');
+    }
+  }
+
+  async sincronizarDatos(): Promise<void> {
+    try {
+      await this.cargarDatos();
+      await this.cargarPedidosParaLlevar();
+      await this.cargarPedidosDelivery();
+      await this.cargarHistorialPagados();
+      await this.calcularTotales();
+      await this.renderMesas();
+      this.cdr.detectChanges();
+    } catch (error) {
+      console.error('Error al sincronizar datos:', error);
+    }
+  }
 
   async generarReporte(): Promise<void> {
     if (!this.fechaInicioReporte || !this.fechaFinReporte) {
@@ -2280,12 +2502,12 @@ export class HomeComponent implements OnInit {
     try {
       // Obtener todos los pagos del historial
       const todosLosPagos = await this.dexieService.getHistorialPagos();
-      
+
       // Filtrar pagos por rango de fechas
       const fechaInicio = new Date(this.fechaInicioReporte);
       const fechaFin = new Date(this.fechaFinReporte);
       fechaFin.setHours(23, 59, 59, 999); // Incluir todo el día final
-      
+
       const pagosFiltrados = todosLosPagos.filter(pago => {
         const fechaPago = new Date(pago.fecha);
         return fechaPago >= fechaInicio && fechaPago <= fechaFin;
@@ -2300,7 +2522,7 @@ export class HomeComponent implements OnInit {
       pagosFiltrados.forEach(pago => {
         const monto = pago.total || 0;
         this.totalReporte += monto;
-        
+
         switch (pago.metodoPago?.toLowerCase()) {
           case 'efectivo':
             this.efectivoReporte += monto;
@@ -2316,15 +2538,15 @@ export class HomeComponent implements OnInit {
 
       // Calcular ganancia (asumiendo que es el total menos gastos/costos)
       this.gananciaReporte = this.totalReporte;
-      
+
       // Guardar detalles para la tabla
-      this.detallesReporte = pagosFiltrados.sort((a, b) => 
+      this.detallesReporte = pagosFiltrados.sort((a, b) =>
         new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
       );
-      
+
       // Mostrar el resumen
       this.mostrarResumenReporte = true;
-      
+
       this.notificationService.success(`Reporte generado: ${pagosFiltrados.length} pagos encontrados`);
     } catch (error) {
       console.error('Error al generar reporte:', error);
@@ -2337,7 +2559,7 @@ export class HomeComponent implements OnInit {
       this.notificationService.error('Primero genera un reporte');
       return;
     }
-    
+
     // Aquí se puede implementar la lógica para generar gráficas
     this.notificationService.info('Funcionalidad de gráficas en desarrollo');
   }
@@ -2397,7 +2619,7 @@ export class HomeComponent implements OnInit {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
     }
-    
+
     this.heartbeatInterval = setInterval(() => {
       if (this.socketService.isConnected()) {
         this.socketService.emit('ping', { timestamp: Date.now() });
@@ -2417,7 +2639,7 @@ export class HomeComponent implements OnInit {
     this.reconnectAttempts++;
 
     console.log(`Reintentando conexión en ${delay}ms (intento ${this.reconnectAttempts})`);
-    
+
     setTimeout(() => {
       this.socketService.connect({ usuario: this.usuarioActual?.nombre || 'Usuario' });
     }, delay);
@@ -2427,7 +2649,7 @@ export class HomeComponent implements OnInit {
     if (this.eventQueue.length === 0) return;
 
     console.log(`Procesando ${this.eventQueue.length} eventos en cola`);
-    
+
     const eventos = [...this.eventQueue];
     this.eventQueue = [];
 

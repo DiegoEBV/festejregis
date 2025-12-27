@@ -33,7 +33,8 @@ export class AuthService {
       const userInfo = { 
         tipo, 
         nombre: nombre || tipo, 
-        autenticado: true 
+        autenticado: true,
+        clave: clave // Guardar clave para autenticación de socket
       };
       localStorage.setItem('currentUser', JSON.stringify(userInfo));
       this.currentUserSubject.next(userInfo);
